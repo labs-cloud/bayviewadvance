@@ -9,10 +9,6 @@ const FAQ = () => {
       answer: "We're a brokerage that helps businesses secure funding, loans, and financial solutions by connecting them with trusted lenders."
     },
     {
-      question: "Do you provide the loans directly?",
-      answer: "No. We are not a direct lender. We work with a network of lending partners to find the best options for your business."
-    },
-    {
       question: "What types of funding do you help with?",
       answer: "We work with small business loans, lines of credit, equipment financing, working capital, and SBA loans."
     },
