@@ -21,9 +21,6 @@ const Header = () => {
             <Link to="/faq" className="text-foreground hover:text-trust transition-colors">
               FAQ
             </Link>
-            <a href="#contact" className="text-foreground hover:text-trust transition-colors">
-              CONTACT
-            </a>
             <div className="flex items-center space-x-2 text-sm text-muted-foreground">
               <Phone className="h-4 w-4" />
               <span>+1 828-604-6224</span>
