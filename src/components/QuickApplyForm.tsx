@@ -1,30 +1,29 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowRight, DollarSign, Building, Phone, Mail, User } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import formBackground from "@/assets/form-background.jpg";
+
 const QuickApplyForm = () => {
-  return <section id="quick-apply" className="relative py-20 overflow-hidden">
-      {/* Enhanced background with form imagery */}
-      <div className="absolute inset-0">
-        <img src={formBackground} alt="Application Background" className="w-full h-full object-cover" />
-        
-        
+  return (
+    <section id="quick-apply" className="py-20 bg-gray-50">
+      <div className="container mx-auto px-4 text-center">
+        <h2 className="text-3xl md:text-4xl font-bold text-[#2c4a6e] mb-4 font-montserrat">
+          Ready to Get Funded?
+        </h2>
+        <p className="text-lg text-slate-600 max-w-2xl mx-auto mb-8">
+          Apply in minutes and get a decision fast. Our streamlined process makes it easy to access the capital your business needs.
+        </p>
+        <Button
+          size="lg"
+          className="bg-[#2c4a6e] hover:bg-[#1e3a5c] text-white font-bold px-10 py-6 text-lg rounded-md shadow-md hover:shadow-lg transition-all"
+          asChild
+        >
+          <Link to="/quick-apply">
+            Apply Now <ArrowRight className="ml-2 h-5 w-5" />
+          </Link>
+        </Button>
       </div>
-      
-      {/* Decorative floating elements */}
-      <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-warning rounded-full blur-3xl animate-float opacity-60"></div>
-      <div className="absolute bottom-20 right-10 w-48 h-48 bg-gradient-success rounded-full blur-3xl animate-float opacity-40" style={{
-      animationDelay: '1s'
-    }}></div>
-      
-      <div className="container mx-auto px-4 relative z-10">
-        
-      </div>
-    </section>;
+    </section>
+  );
 };
+
 export default QuickApplyForm;

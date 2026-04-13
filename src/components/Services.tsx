@@ -58,24 +58,13 @@ const Services = () => {
   ];
 
   return (
-    <section id="services" className="relative py-20 overflow-hidden">
-      {/* Enhanced background */}
-      <div className="absolute inset-0">
-        <img 
-          src="/src/assets/services-workspace.jpg" 
-          alt="Services Background" 
-          className="w-full h-full object-cover opacity-30"
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-secondary/30 to-accent/20"></div>
-        <div className="absolute inset-0 bg-gradient-mesh"></div>
-      </div>
-      
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center mb-16 animate-fade-up">
-          <h2 className="text-4xl font-bold text-primary mb-4">
-            FUNDING SOLUTIONS FOR EVERY BUSINESS
+    <section id="services" className="py-20 bg-gray-50">
+      <div className="container mx-auto px-4">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold text-[#2c4a6e] mb-4 font-montserrat">
+            Funding Solutions for Every Business
           </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+          <p className="text-lg text-slate-600 max-w-3xl mx-auto">
             Choose from multiple financing options designed to meet your unique business needs and cash flow requirements.
           </p>
         </div>
@@ -84,27 +73,27 @@ const Services = () => {
           {services.map((service, index) => {
             const Icon = service.icon;
             return (
-              <Card key={index} className="bg-gradient-to-br from-white via-blue-50/80 to-bayview-accent/10 border-blue-200/60 shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-2 animate-scale-in backdrop-blur-sm" style={{ animationDelay: `${index * 0.1}s` }}>
+              <Card key={index} className="bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">
                 <CardHeader className="text-center">
-                  <div className="mx-auto w-16 h-16 bg-gradient-to-br from-bayview-primary to-bayview-accent rounded-full flex items-center justify-center mb-4 shadow-md">
-                    <Icon className="h-8 w-8 text-white" />
+                  <div className="mx-auto w-14 h-14 bg-[#2c4a6e] rounded-full flex items-center justify-center mb-4">
+                    <Icon className="h-7 w-7 text-white" />
                   </div>
-                  <CardTitle className="text-xl text-bayview-primary font-bold">{service.title}</CardTitle>
-                  <div className="text-2xl font-bold text-bayview-accent">{service.amount}</div>
+                  <CardTitle className="text-lg text-[#2c4a6e] font-bold">{service.title}</CardTitle>
+                  <div className="text-xl font-bold text-[#5b8fb9]">{service.amount}</div>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription className="text-center mb-4 leading-relaxed">
+                  <CardDescription className="text-center mb-4 leading-relaxed text-slate-600">
                     {service.description}
                   </CardDescription>
                   <ul className="space-y-2 mb-6">
                     {service.features.map((feature, featureIndex) => (
-                      <li key={featureIndex} className="flex items-center text-sm text-muted-foreground">
-                        <div className="w-2 h-2 bg-bayview-accent rounded-full mr-3"></div>
+                      <li key={featureIndex} className="flex items-center text-sm text-slate-600">
+                        <div className="w-2 h-2 bg-[#5b8fb9] rounded-full mr-3 flex-shrink-0"></div>
                         {feature}
                       </li>
                     ))}
                   </ul>
-                  <Button variant="outline" className="w-full hover:bg-bayview-accent hover:text-white hover:border-bayview-accent border-bayview-accent/50 text-bayview-primary">
+                  <Button variant="outline" className="w-full border-[#2c4a6e]/30 text-[#2c4a6e] hover:bg-[#2c4a6e] hover:text-white">
                     Learn More
                   </Button>
                 </CardContent>
@@ -113,20 +102,20 @@ const Services = () => {
           })}
         </div>
 
-        <div className="bg-gradient-to-br from-white via-bayview-accent/5 to-white rounded-2xl shadow-elegant p-8 border border-bayview-accent/10">
-          <h3 className="text-3xl font-bold text-center text-primary mb-12">
+        <div className="bg-white rounded-2xl shadow-sm p-8 border border-slate-200">
+          <h3 className="text-2xl md:text-3xl font-bold text-center text-[#2c4a6e] mb-12 font-montserrat">
             Why Choose Bayview Advance?
           </h3>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {advantages.map((advantage, index) => {
               const Icon = advantage.icon;
               return (
-                <div key={index} className="text-center animate-fade-up" style={{ animationDelay: `${(index + 4) * 0.1}s` }}>
-                  <div className="mx-auto w-12 h-12 bg-gradient-to-br from-bayview-accent/20 to-bayview-accent/30 rounded-full flex items-center justify-center mb-4">
-                    <Icon className="h-6 w-6 text-bayview-accent" />
+                <div key={index} className="text-center">
+                  <div className="mx-auto w-12 h-12 bg-[#5b8fb9]/15 rounded-full flex items-center justify-center mb-4">
+                    <Icon className="h-6 w-6 text-[#5b8fb9]" />
                   </div>
-                  <h4 className="text-lg font-semibold text-bayview-primary mb-2">{advantage.title}</h4>
-                  <p className="text-muted-foreground text-sm leading-relaxed">{advantage.description}</p>
+                  <h4 className="text-lg font-semibold text-[#2c4a6e] mb-2">{advantage.title}</h4>
+                  <p className="text-slate-600 text-sm leading-relaxed">{advantage.description}</p>
                 </div>
               );
             })}

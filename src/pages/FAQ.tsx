@@ -33,38 +33,28 @@ const FAQ = () => {
   return (
     <div className="min-h-screen">
       <Header />
-      
-      {/* FAQ Section */}
-      <section className="relative py-20 px-4 overflow-hidden">
-        {/* Background with city skyline and gradient */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: `url('/src/assets/city-skyline.jpg')`
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-bayview-primary via-bayview-primary/90 to-bayview-accent/80" />
-        
-        <div className="relative max-w-4xl mx-auto">
+
+      <section className="py-20 px-4 bg-[#2c4a6e]">
+        <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="font-garamond text-5xl font-bold text-white mb-4">
-              FREQUENTLY ASKED QUESTIONS
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 font-montserrat">
+              Frequently Asked Questions
             </h1>
-            <div className="w-24 h-1 bg-bayview-accent mx-auto"></div>
+            <div className="w-16 h-1 bg-[#5b8fb9] mx-auto"></div>
           </div>
 
-          <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 shadow-premium">
+          <div className="bg-white rounded-2xl p-8 shadow-lg">
             <Accordion type="single" collapsible className="space-y-4">
               {faqs.map((faq, index) => (
-                <AccordionItem 
-                  key={index} 
+                <AccordionItem
+                  key={index}
                   value={`item-${index}`}
-                  className="border border-border/20 rounded-lg px-6 bg-white/50"
+                  className="border border-slate-200 rounded-lg px-6 bg-gray-50"
                 >
-                  <AccordionTrigger className="text-left text-bayview-primary hover:text-bayview-accent font-semibold">
+                  <AccordionTrigger className="text-left text-[#2c4a6e] hover:text-[#5b8fb9] font-semibold">
                     {faq.question}
                   </AccordionTrigger>
-                  <AccordionContent className="text-foreground/80 leading-relaxed">
+                  <AccordionContent className="text-slate-600 leading-relaxed">
                     {faq.answer}
                   </AccordionContent>
                 </AccordionItem>
