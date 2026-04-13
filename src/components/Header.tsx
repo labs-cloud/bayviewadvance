@@ -13,7 +13,7 @@ const Header = () => {
           <div className="flex items-center">
             <Link to="/">
               <img
-                src="/lovable-uploads/06ea678f-b8c6-4f3e-840a-4cf85fb809f4.png"
+                src="/lovable-uploads/new-logo.png"
                 alt="Bayview Advance"
                 className="h-14 md:h-16 w-auto cursor-pointer hover:opacity-90 transition-opacity"
               />

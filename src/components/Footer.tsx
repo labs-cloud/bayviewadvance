@@ -8,9 +8,9 @@ const Footer = () => {
         <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-8 text-center">
           <div className="space-y-4 flex flex-col items-center">
             <img
-              src="/lovable-uploads/286df6e3-0d61-442c-aced-336d1ff0dd93.png"
+              src="/lovable-uploads/new-logo.png"
               alt="Bayview Advance"
-              className="h-16 w-auto brightness-0 invert mx-auto"
+              className="h-16 w-auto mx-auto"
             />
             <p className="text-slate-300 leading-relaxed text-center text-sm">
               Providing fast, flexible business funding solutions to help entrepreneurs
