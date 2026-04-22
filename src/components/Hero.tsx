@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import heroBackground from "@/assets/city-skyline.jpg";
+import heroBackground from "@/assets/hero-finance-light.jpg";
 
 const Hero = () => {
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ const Hero = () => {
           className="w-full h-full object-cover"
           loading="eager"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-[#0b1e33]/85 to-black/90"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-[#1e3a5c]/30 via-[#1e3a5c]/40 to-[#1e3a5c]/60"></div>
       </div>
 
       <div className="container mx-auto px-4 relative z-10">
