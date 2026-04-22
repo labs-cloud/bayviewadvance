@@ -15,7 +15,7 @@ const Header = () => {
               <img
                 src="/lovable-uploads/new-logo.png"
                 alt="Bayview Advance"
-                className="h-14 md:h-16 w-auto cursor-pointer hover:opacity-90 transition-opacity"
+                className="h-20 md:h-28 w-auto cursor-pointer hover:opacity-90 transition-opacity"
               />
             </Link>
           </div>
