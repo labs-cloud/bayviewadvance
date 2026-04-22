@@ -10,7 +10,7 @@ const Footer = () => {
             <img
               src="/lovable-uploads/new-logo.png"
               alt="Bayview Advance"
-              className="h-16 w-auto mx-auto brightness-0 invert"
+              className="h-16 w-auto mx-auto invert brightness-200 contrast-125 mix-blend-screen"
             />
             <p className="text-slate-300 leading-relaxed text-center text-sm">
               Providing fast, flexible business funding solutions to help entrepreneurs
