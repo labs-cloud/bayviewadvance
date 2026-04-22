@@ -7,11 +7,6 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="grid lg:grid-cols-4 md:grid-cols-2 gap-8 text-center">
           <div className="space-y-4 flex flex-col items-center">
-            <img
-              src="/lovable-uploads/new-logo.png"
-              alt="Bayview Advance"
-              className="h-16 w-auto mx-auto invert brightness-200 contrast-125 mix-blend-screen"
-            />
             <p className="text-slate-300 leading-relaxed text-center text-sm">
               Providing fast, flexible business funding solutions to help entrepreneurs
               and small businesses achieve their growth goals.
@@ -65,9 +60,16 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-white/10 mt-12 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center text-center">
-            <p className="text-slate-400 text-sm">&copy; 2025 Bayview Advance. All rights reserved.</p>
-            <div className="flex space-x-6 text-sm text-slate-400 mt-4 md:mt-0">
+          <div className="flex flex-col md:flex-row justify-between items-center text-center gap-4">
+            <div className="flex flex-col md:items-start items-center gap-2">
+              <img
+                src="/lovable-uploads/new-logo.png"
+                alt="Bayview Advance"
+                className="h-12 w-auto invert brightness-200 contrast-125 mix-blend-screen"
+              />
+              <p className="text-slate-400 text-sm">&copy; 2025 Bayview Advance. All rights reserved.</p>
+            </div>
+            <div className="flex space-x-6 text-sm text-slate-400">
               <a href="/privacy" className="hover:text-white transition-colors">Privacy Policy</a>
               <a href="/terms" className="hover:text-white transition-colors">Terms of Service</a>
             </div>
