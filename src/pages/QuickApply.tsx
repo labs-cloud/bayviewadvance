@@ -83,21 +83,21 @@ const QuickApply = () => {
       }
 
       // Fire-and-forget email notification. Don't block navigation if the
-      // edge function isn't deployed yet or fails for another reason.
-      supabase.functions
-        .invoke('send-application-email', {
-          body: {
-            full_name: formData.fullName,
-            business_name: formData.businessName,
-            email: formData.email,
-            phone: formData.phone,
-            monthly_revenue_range: formData.monthlyRevenue,
-            funding_needed_range: formData.fundingNeeded,
-            purpose: formData.purpose,
-            source: 'quick',
-          },
-        })
-        .catch((err) => console.error('send-application-email failed:', err));
+      // serverless endpoint isn't configured or fails for another reason.
+      fetch('/api/send-application-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: formData.fullName,
+          business_name: formData.businessName,
+          email: formData.email,
+          phone: formData.phone,
+          monthly_revenue_range: formData.monthlyRevenue,
+          funding_needed_range: formData.fundingNeeded,
+          purpose: formData.purpose,
+          source: 'quick',
+        }),
+      }).catch((err) => console.error('send-application-email failed:', err));
 
       navigate('/thank-you');
     } catch (error) {
