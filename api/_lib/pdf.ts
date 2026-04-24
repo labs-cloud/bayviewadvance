@@ -133,7 +133,7 @@ export async function generateApplicationPdf(
   const logoHeight = 44;
   if (data.logo) {
     try {
-      const img = await pdf.embedPng(data.logo);
+      const img = data.logo[0] === 0x89 ? await pdf.embedPng(data.logo) : await pdf.embedJpg(data.logo);
       const scaled = img.scaleToFit(150, logoHeight);
       page.drawImage(img, {
         x: MARGIN,
