@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Resend } from "resend";
 
 const LABELS: Record<string, string> = {
+  source: "Source",
   full_name: "Full Name",
   business_name: "Business Name",
   email: "Email",
@@ -9,7 +10,22 @@ const LABELS: Record<string, string> = {
   monthly_revenue_range: "Monthly Revenue",
   funding_needed_range: "Funding Needed",
   purpose: "Purpose",
-  source: "Source",
+  rep: "Rep",
+  legal_business_name: "Legal Business Name",
+  dba: "DBA",
+  business_start_date: "Business Start Date",
+  business_address: "Business Address",
+  entity_type: "Entity Type",
+  state_incorporated: "State Incorporated",
+  ein: "Federal Tax ID (EIN)",
+  industry: "Industry",
+  owner_name: "Owner Name",
+  date_of_birth: "Date of Birth",
+  ssn: "SSN",
+  home_address: "Home Address",
+  ownership: "Ownership",
+  owner_signature: "Owner Signature",
+  signature_date: "Signature Date",
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -29,6 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const application = (req.body ?? {}) as Record<string, unknown>;
 
   const rows = Object.entries(application)
+    .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "")
     .map(
       ([k, v]) =>
         `<tr><td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;color:#475569;font-weight:600">${
@@ -39,7 +56,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     )
     .join("");
 
-  const businessName = String(application.business_name ?? "Unknown Business");
+  const businessName = String(
+    application.business_name ?? application.legal_business_name ?? "Unknown Business",
+  );
   const replyTo = typeof application.email === "string" ? application.email : undefined;
 
   const html = `

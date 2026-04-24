@@ -62,42 +62,40 @@ const QuickApply = () => {
 
     setIsSubmitting(true);
 
+    const payload = {
+      full_name: formData.fullName,
+      business_name: formData.businessName,
+      email: formData.email,
+      phone: formData.phone,
+      monthly_revenue_range: formData.monthlyRevenue,
+      funding_needed_range: formData.fundingNeeded,
+      purpose: formData.purpose,
+      source: 'quick',
+    };
+
     try {
-      const { error } = await supabase
-        .from('applications')
-        .insert({
-          full_name: formData.fullName,
-          business_name: formData.businessName,
-          email: formData.email,
-          phone: formData.phone,
-          monthly_revenue_range: formData.monthlyRevenue,
-          funding_needed_range: formData.fundingNeeded,
-          purpose: formData.purpose,
-          contact_consent: formData.contactConsent,
-          terms_consent: formData.termsConsent,
-          source: 'quick'
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      // Fire-and-forget email notification. Don't block navigation if the
-      // serverless endpoint isn't configured or fails for another reason.
-      fetch('/api/send-application-email', {
+      const res = await fetch('/api/send-application-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          full_name: formData.fullName,
-          business_name: formData.businessName,
-          email: formData.email,
-          phone: formData.phone,
-          monthly_revenue_range: formData.monthlyRevenue,
-          funding_needed_range: formData.fundingNeeded,
-          purpose: formData.purpose,
-          source: 'quick',
-        }),
-      }).catch((err) => console.error('send-application-email failed:', err));
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const detail = await res.json().catch(() => ({}));
+        throw new Error(detail.error ?? `HTTP ${res.status}`);
+      }
+
+      // Best-effort DB log; don't block the user on failure.
+      supabase
+        .from('applications')
+        .insert({
+          ...payload,
+          contact_consent: formData.contactConsent,
+          terms_consent: formData.termsConsent,
+        })
+        .then(({ error }) => {
+          if (error) console.error('applications insert failed:', error);
+        });
 
       navigate('/thank-you');
     } catch (error) {
