@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Resend } from "resend";
-import type { FieldPair } from "./_lib/pdf";
-import { renderApplicationEmail, EmailSection } from "./_lib/email-template";
+import type { FieldPair } from "./_lib/pdf.js";
+import { renderApplicationEmail, EmailSection } from "./_lib/email-template.js";
 
 const DISCLAIMER = `By signing below, each of the above-listed business and business owner(s) (individually and collectively, "you") authorize Bayview Advance ("B/A") and each of its representatives, successors, assigns and designees ("Recipients") that may be involved with or require commercial loans having daily repayment features or Merchant Cash Advance transactions, including without limitation the application(s) herein (collectively, "Transactions") to obtain consumer or personal, business and investigative reports and other information about you, including credit card processor statements and bank statements; bureau or non-consumer reporting agencies; and/or third parties. Equifax, Experian and/or from other credit bureaus, banks, creditors and other third parties. You also authorize B/A to transmit this application form, along with any of the foregoing information obtained in connection with this application, to any or all of the Recipients for the foregoing purposes. You also consent to the release, by any creditor or financial institution, of any information relating to any of you, to B/A and to each of the Recipients, on its own behalf.`;
 
@@ -26,7 +26,7 @@ function getHost(req: VercelRequest): string {
 async function fetchLogo(host: string): Promise<Buffer | undefined> {
   try {
     const protocol = host.startsWith("localhost") ? "http" : "https";
-    const res = await fetch(`${protocol}://${host}/lovable-uploads/new-logo.png`);
+    const res = await fetch("https://www.bayviewadvance.com/lovable-uploads/new-logo.png");
     if (!res.ok) return undefined;
     const buf = await res.arrayBuffer();
     return Buffer.from(buf);
@@ -137,7 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const payload = (req.body ?? {}) as Payload;
   const host = getHost(req);
-  const logoUrl = `${host.startsWith("localhost") ? "http" : "https"}://${host}/lovable-uploads/new-logo.png`;
+  const logoUrl = "https://www.bayviewadvance.com/lovable-uploads/new-logo.png";
 
   const sections = buildSections(payload);
   const submittedAt = new Date().toLocaleString("en-US", {
@@ -156,7 +156,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   let pdfAttachment: { filename: string; content: string } | undefined;
   try {
-    const { generateApplicationPdf } = await import("./_lib/pdf");
+    const { generateApplicationPdf } = await import("./_lib/pdf.js");
     const logoBuffer = await fetchLogo(host);
     const pdfBuffer = await generateApplicationPdf({
       businessFields: sections.businessPdf,
