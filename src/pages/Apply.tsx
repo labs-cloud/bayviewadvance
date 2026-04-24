@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -6,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useToast } from "@/hooks/use-toast";
 
 const US_STATES = [
   "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
@@ -18,8 +21,116 @@ const US_STATES = [
   "Wisconsin", "Wyoming",
 ];
 
+type FormState = {
+  rep: string;
+  legalBusinessName: string;
+  dba: string;
+  businessStartDate: string;
+  businessAddress: string;
+  entityType: string;
+  stateIncorporated: string;
+  ein: string;
+  industry: string;
+  ownerFirstName: string;
+  ownerLastName: string;
+  dob: string;
+  ssn: string;
+  homeAddress: string;
+  ownership: string;
+  signature: string;
+  signatureDate: string;
+};
+
 const Apply = () => {
   const today = new Date().toISOString().slice(0, 10);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState<FormState>({
+    rep: "",
+    legalBusinessName: "",
+    dba: "",
+    businessStartDate: "",
+    businessAddress: "",
+    entityType: "",
+    stateIncorporated: "",
+    ein: "",
+    industry: "",
+    ownerFirstName: "",
+    ownerLastName: "",
+    dob: "",
+    ssn: "",
+    homeAddress: "",
+    ownership: "single",
+    signature: "",
+    signatureDate: today,
+  });
+
+  const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const required: (keyof FormState)[] = [
+      "legalBusinessName", "businessStartDate", "businessAddress", "entityType",
+      "stateIncorporated", "ein", "industry", "ownerFirstName", "ownerLastName",
+      "dob", "ssn", "homeAddress", "ownership", "signature", "signatureDate",
+    ];
+    const missing = required.filter((k) => !form[k]);
+    if (missing.length > 0) {
+      toast({
+        title: "Please fill in all required fields",
+        description: "All fields marked with * are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/send-application-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: "full",
+          rep: form.rep,
+          legal_business_name: form.legalBusinessName,
+          dba: form.dba,
+          business_start_date: form.businessStartDate,
+          business_address: form.businessAddress,
+          entity_type: form.entityType,
+          state_incorporated: form.stateIncorporated,
+          ein: form.ein,
+          industry: form.industry,
+          owner_name: `${form.ownerFirstName} ${form.ownerLastName}`.trim(),
+          email: "",
+          date_of_birth: form.dob,
+          ssn: form.ssn,
+          home_address: form.homeAddress,
+          ownership: form.ownership,
+          owner_signature: form.signature,
+          signature_date: form.signatureDate,
+        }),
+      });
+
+      if (!res.ok) {
+        const detail = await res.json().catch(() => ({}));
+        throw new Error(detail.error ?? `HTTP ${res.status}`);
+      }
+
+      navigate("/thank-you");
+    } catch (error) {
+      console.error("Error submitting application:", error);
+      toast({
+        title: "Submission failed",
+        description: "There was an error submitting your application. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -45,10 +156,10 @@ const Apply = () => {
                   <p className="text-sm text-slate-500 italic mt-1">Funding Made Simple</p>
                 </div>
 
-                <form className="space-y-8">
+                <form className="space-y-8" onSubmit={handleSubmit}>
                   <div>
                     <Label htmlFor="rep">Rep *</Label>
-                    <Select>
+                    <Select value={form.rep} onValueChange={(v) => update("rep", v)}>
                       <SelectTrigger id="rep">
                         <SelectValue placeholder="Please Select" />
                       </SelectTrigger>
@@ -66,29 +177,46 @@ const Apply = () => {
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
                         <Label htmlFor="legalBusinessName">Legal Business Name: *</Label>
-                        <Input id="legalBusinessName" />
+                        <Input
+                          id="legalBusinessName"
+                          value={form.legalBusinessName}
+                          onChange={(e) => update("legalBusinessName", e.target.value)}
+                        />
                       </div>
                       <div>
                         <Label htmlFor="dba">DBA:</Label>
-                        <Input id="dba" />
+                        <Input
+                          id="dba"
+                          value={form.dba}
+                          onChange={(e) => update("dba", e.target.value)}
+                        />
                       </div>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
                         <Label htmlFor="businessStartDate">Business Start Date: *</Label>
-                        <Input id="businessStartDate" type="date" placeholder="MM-DD-YYYY" />
+                        <Input
+                          id="businessStartDate"
+                          type="date"
+                          value={form.businessStartDate}
+                          onChange={(e) => update("businessStartDate", e.target.value)}
+                        />
                       </div>
                       <div>
                         <Label htmlFor="businessAddress">Business Address: *</Label>
-                        <Input id="businessAddress" />
+                        <Input
+                          id="businessAddress"
+                          value={form.businessAddress}
+                          onChange={(e) => update("businessAddress", e.target.value)}
+                        />
                       </div>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
                         <Label htmlFor="entityType">Entity Type: *</Label>
-                        <Select>
+                        <Select value={form.entityType} onValueChange={(v) => update("entityType", v)}>
                           <SelectTrigger id="entityType">
                             <SelectValue placeholder="Please Select" />
                           </SelectTrigger>
@@ -105,7 +233,7 @@ const Apply = () => {
                       </div>
                       <div>
                         <Label htmlFor="stateIncorporated">State Incorporated: *</Label>
-                        <Select>
+                        <Select value={form.stateIncorporated} onValueChange={(v) => update("stateIncorporated", v)}>
                           <SelectTrigger id="stateIncorporated">
                             <SelectValue placeholder="Please Select" />
                           </SelectTrigger>
@@ -123,11 +251,16 @@ const Apply = () => {
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
                         <Label htmlFor="ein">Federal Tax ID (EIN #): *</Label>
-                        <Input id="ein" placeholder="XX-XXXXXXX" />
+                        <Input
+                          id="ein"
+                          placeholder="XX-XXXXXXX"
+                          value={form.ein}
+                          onChange={(e) => update("ein", e.target.value)}
+                        />
                       </div>
                       <div>
                         <Label htmlFor="industry">Industry: *</Label>
-                        <Select>
+                        <Select value={form.industry} onValueChange={(v) => update("industry", v)}>
                           <SelectTrigger id="industry">
                             <SelectValue placeholder="Please Select" />
                           </SelectTrigger>
@@ -157,11 +290,21 @@ const Apply = () => {
                       <Label htmlFor="ownerFirstName">Owner Name *</Label>
                       <div className="grid md:grid-cols-2 gap-6 mt-1">
                         <div>
-                          <Input id="ownerFirstName" placeholder="First" />
+                          <Input
+                            id="ownerFirstName"
+                            placeholder="First"
+                            value={form.ownerFirstName}
+                            onChange={(e) => update("ownerFirstName", e.target.value)}
+                          />
                           <p className="text-xs text-slate-500 mt-1">First Name</p>
                         </div>
                         <div>
-                          <Input id="ownerLastName" placeholder="Last" />
+                          <Input
+                            id="ownerLastName"
+                            placeholder="Last"
+                            value={form.ownerLastName}
+                            onChange={(e) => update("ownerLastName", e.target.value)}
+                          />
                           <p className="text-xs text-slate-500 mt-1">Last Name</p>
                         </div>
                       </div>
@@ -170,23 +313,41 @@ const Apply = () => {
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
                         <Label htmlFor="dob">Date of Birth: *</Label>
-                        <Input id="dob" type="date" placeholder="MM-DD-YYYY" />
+                        <Input
+                          id="dob"
+                          type="date"
+                          value={form.dob}
+                          onChange={(e) => update("dob", e.target.value)}
+                        />
                       </div>
                       <div>
                         <Label htmlFor="ssn">SSN: *</Label>
-                        <Input id="ssn" placeholder="XXX-XX-XXXX" />
+                        <Input
+                          id="ssn"
+                          placeholder="XXX-XX-XXXX"
+                          value={form.ssn}
+                          onChange={(e) => update("ssn", e.target.value)}
+                        />
                       </div>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
                         <Label htmlFor="homeAddress">Home Address *</Label>
-                        <Input id="homeAddress" />
+                        <Input
+                          id="homeAddress"
+                          value={form.homeAddress}
+                          onChange={(e) => update("homeAddress", e.target.value)}
+                        />
                         <p className="text-xs text-slate-500 mt-1">Home Address</p>
                       </div>
                       <div>
                         <Label>Ownership *</Label>
-                        <RadioGroup className="mt-2" defaultValue="single">
+                        <RadioGroup
+                          className="mt-2"
+                          value={form.ownership}
+                          onValueChange={(v) => update("ownership", v)}
+                        >
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="single" id="ownership-single" />
                             <Label htmlFor="ownership-single" className="font-normal">Single Owner</Label>
@@ -219,27 +380,31 @@ const Apply = () => {
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
                       <Label htmlFor="signature">Owner Signature: *</Label>
-                      <Input id="signature" placeholder="Type full legal name" />
+                      <Input
+                        id="signature"
+                        placeholder="Type full legal name"
+                        value={form.signature}
+                        onChange={(e) => update("signature", e.target.value)}
+                      />
                     </div>
                     <div>
                       <Label htmlFor="signatureDate">Today's Date: *</Label>
-                      <Input id="signatureDate" type="date" defaultValue={today} />
+                      <Input
+                        id="signatureDate"
+                        type="date"
+                        value={form.signatureDate}
+                        onChange={(e) => update("signatureDate", e.target.value)}
+                      />
                     </div>
                   </div>
 
                   <div className="flex justify-center gap-3 pt-4">
                     <Button
-                      type="button"
-                      variant="outline"
-                      className="px-8"
-                    >
-                      Save
-                    </Button>
-                    <Button
                       type="submit"
                       className="bg-[#2c4a6e] hover:bg-[#1e3a5c] text-white font-semibold px-8"
+                      disabled={isSubmitting}
                     >
-                      Submit
+                      {isSubmitting ? "Submitting..." : "Submit Application"}
                     </Button>
                   </div>
                 </form>
