@@ -1,5 +1,10 @@
 {
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/send-application-email.ts": {
+      "includeFiles": "node_modules/pdfkit/js/data/**"
+    }
+  }
 }

@@ -115,8 +115,15 @@ const Apply = () => {
       });
 
       if (!res.ok) {
-        const detail = await res.json().catch(() => ({}));
-        throw new Error(detail.error ?? `HTTP ${res.status}`);
+        const text = await res.text();
+        console.error("send-application-email response:", res.status, text);
+        let detailError: string | undefined;
+        try {
+          detailError = JSON.parse(text)?.error;
+        } catch {
+          // non-JSON response
+        }
+        throw new Error(detailError ?? `HTTP ${res.status}: ${text.slice(0, 200)}`);
       }
 
       navigate("/thank-you");
