@@ -26,7 +26,7 @@ function getHost(req: VercelRequest): string {
 async function fetchLogo(host: string): Promise<Buffer | undefined> {
   try {
     const protocol = host.startsWith("localhost") ? "http" : "https";
-    const res = await fetch(`${protocol}://${host}/lovable-uploads/new-logo.png`);
+    const res = await fetch("https://www.bayviewadvance.com/lovable-uploads/new-logo.png");
     if (!res.ok) return undefined;
     const buf = await res.arrayBuffer();
     return Buffer.from(buf);
