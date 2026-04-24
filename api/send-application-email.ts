@@ -137,7 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const payload = (req.body ?? {}) as Payload;
   const host = getHost(req);
-  const logoUrl = `${host.startsWith("localhost") ? "http" : "https"}://${host}/lovable-uploads/new-logo.png`;
+  const logoUrl = "https://www.bayviewadvance.com/lovable-uploads/new-logo.png";
 
   const sections = buildSections(payload);
   const submittedAt = new Date().toLocaleString("en-US", {
