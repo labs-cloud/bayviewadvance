@@ -82,6 +82,23 @@ const QuickApply = () => {
         throw error;
       }
 
+      // Fire-and-forget email notification. Don't block navigation if the
+      // edge function isn't deployed yet or fails for another reason.
+      supabase.functions
+        .invoke('send-application-email', {
+          body: {
+            full_name: formData.fullName,
+            business_name: formData.businessName,
+            email: formData.email,
+            phone: formData.phone,
+            monthly_revenue_range: formData.monthlyRevenue,
+            funding_needed_range: formData.fundingNeeded,
+            purpose: formData.purpose,
+            source: 'quick',
+          },
+        })
+        .catch((err) => console.error('send-application-email failed:', err));
+
       navigate('/thank-you');
     } catch (error) {
       console.error('Error submitting application:', error);
@@ -274,7 +291,7 @@ const QuickApply = () => {
                       className="bg-[#2c4a6e] hover:bg-[#1e3a5c] text-white font-bold px-12 group"
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? 'Submitting...' : 'Check My Options'}
+                      {isSubmitting ? 'Submitting...' : 'Submit Application'}
                       <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                     </Button>
                     <p className="text-sm text-slate-500 mt-4">
