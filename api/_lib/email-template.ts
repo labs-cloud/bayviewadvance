@@ -79,15 +79,15 @@ export function renderApplicationEmail(input: EmailTemplateInput): string {
       <td align="center">
         <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,0.08)">
           <tr>
-            <td style="background:linear-gradient(135deg, ${NAVY} 0%, ${NAVY_DARK} 100%);padding:28px 32px;">
+            <td style="background:#ffffff;padding:28px 32px;border-bottom:1px solid ${SLATE_300}">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td style="vertical-align:middle">
-                    <img src="${logoUrl}" alt="Bayview Advance" width="160" style="display:block;max-width:160px;height:auto;filter:brightness(0) invert(1)" />
+                    <img src="${logoUrl}" alt="Bayview Advance" width="160" style="display:block;max-width:160px;height:auto" />
                   </td>
-                  <td align="right" style="vertical-align:middle;color:#ffffff">
-                    <div style="font-size:11px;letter-spacing:1.4px;text-transform:uppercase;opacity:0.75">Funding Application</div>
-                    <div style="font-size:16px;font-weight:600;margin-top:4px">Funding Made Simple</div>
+                  <td align="right" style="vertical-align:middle">
+                    <div style="font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:${SLATE_500}">Funding Application</div>
+                    <div style="font-size:16px;font-weight:600;margin-top:4px;color:${NAVY}">Funding Made Simple</div>
                   </td>
                 </tr>
               </table>
