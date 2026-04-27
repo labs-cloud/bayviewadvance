@@ -1,122 +1,113 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Resend } from "resend";
-import type { FieldPair } from "./_lib/pdf";
-import { renderApplicationEmail, EmailSection } from "./_lib/email-template";
 
-const DISCLAIMER = `By signing below, each of the above-listed business and business owner(s) (individually and collectively, "you") authorize Bayview Advance ("B/A") and each of its representatives, successors, assigns and designees ("Recipients") that may be involved with or require commercial loans having daily repayment features or Merchant Cash Advance transactions, including without limitation the application(s) herein (collectively, "Transactions") to obtain consumer or personal, business and investigative reports and other information about you, including credit card processor statements and bank statements; bureau or non-consumer reporting agencies; and/or third parties. Equifax, Experian and/or from other credit bureaus, banks, creditors and other third parties. You also authorize B/A to transmit this application form, along with any of the foregoing information obtained in connection with this application, to any or all of the Recipients for the foregoing purposes. You also consent to the release, by any creditor or financial institution, of any information relating to any of you, to B/A and to each of the Recipients, on its own behalf.`;
+const NAVY = "#1e3a5c";
+const SLATE = "#475569";
+const SLATE_LIGHT = "#f8fafc";
 
-type Payload = Record<string, unknown> & {
-  source?: string;
-  email?: string;
+const QUICK_LABELS: Record<string, string> = {
+  full_name: "Full Name",
+  business_name: "Business Name",
+  email: "Email",
+  phone: "Phone",
+  monthly_revenue_range: "Monthly Revenue",
+  funding_needed_range: "Funding Needed",
+  purpose: "Purpose",
 };
 
-function str(v: unknown): string {
-  if (v === undefined || v === null) return "";
-  return String(v);
+const FULL_LABELS: Record<string, string> = {
+  rep: "Rep",
+  legal_business_name: "Legal Business Name",
+  dba: "DBA",
+  business_start_date: "Business Start Date",
+  business_address: "Business Address",
+  entity_type: "Entity Type",
+  state_incorporated: "State Incorporated",
+  ein: "Federal Tax ID (EIN)",
+  industry: "Industry",
+  owner_name: "Owner Name",
+  ownership: "Ownership",
+  date_of_birth: "Date of Birth",
+  ssn: "SSN",
+  home_address: "Home Address",
+  owner_signature: "Owner Signature",
+  signature_date: "Signature Date",
+};
+
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-function getHost(req: VercelRequest): string {
-  const host =
-    (req.headers["x-forwarded-host"] as string | undefined) ??
-    (req.headers.host as string | undefined) ??
-    process.env.VERCEL_URL;
-  return host ?? "bayviewadvance.com";
+function row(label: string, value: string): string {
+  return `<tr>
+    <td style="padding:10px 16px;border-bottom:1px solid #cbd5e1;color:${SLATE};font-weight:600;font-size:11px;letter-spacing:0.6px;text-transform:uppercase;width:42%;vertical-align:top">${escapeHtml(label)}</td>
+    <td style="padding:10px 16px;border-bottom:1px solid #cbd5e1;color:#0f172a;font-size:14px">${escapeHtml(value || "—")}</td>
+  </tr>`;
 }
 
-async function fetchLogo(host: string): Promise<Buffer | undefined> {
-  try {
-    const protocol = host.startsWith("localhost") ? "http" : "https";
-    const res = await fetch(`${protocol}://${host}/lovable-uploads/new-logo.png`);
-    if (!res.ok) return undefined;
-    const buf = await res.arrayBuffer();
-    return Buffer.from(buf);
-  } catch {
-    return undefined;
-  }
-}
+function buildEmail(payload: Record<string, unknown>): { subject: string; html: string; replyTo?: string } {
+  const isQuick = payload.source === "quick" || payload.full_name !== undefined;
+  const labels = isQuick ? QUICK_LABELS : FULL_LABELS;
+  const headline = String(
+    payload.business_name ?? payload.legal_business_name ?? "Unknown Business",
+  );
 
-function buildSections(payload: Payload): {
-  email: EmailSection[];
-  businessPdf: FieldPair[];
-  ownerPdf: FieldPair[];
-  headline: string;
-  signature: string;
-  signatureDate: string;
-} {
-  const source = str(payload.source);
-  const isQuick = source === "quick" || !!payload.full_name;
+  const rows = Object.entries(labels)
+    .map(([key, label]) => {
+      const value = payload[key];
+      if (value === undefined || value === null || String(value).trim() === "") {
+        return "";
+      }
+      return row(label, String(value));
+    })
+    .join("");
 
-  if (isQuick) {
-    const headline = str(payload.business_name) || "Unknown Business";
-    const contactFields = [
-      { label: "Full Name", value: str(payload.full_name) },
-      { label: "Business Name", value: str(payload.business_name) },
-      { label: "Email", value: str(payload.email) },
-      { label: "Phone", value: str(payload.phone) },
-    ];
-    const fundingFields = [
-      { label: "Monthly Revenue", value: str(payload.monthly_revenue_range) },
-      { label: "Funding Needed", value: str(payload.funding_needed_range) },
-      { label: "Purpose", value: str(payload.purpose) },
-    ];
+  const submittedAt = new Date().toLocaleString("en-US", {
+    dateStyle: "long",
+    timeStyle: "short",
+    timeZone: "America/New_York",
+  }) + " ET";
 
-    return {
-      email: [
-        { heading: "Applicant", fields: contactFields },
-        { heading: "Funding Request", fields: fundingFields },
-      ],
-      businessPdf: [
-        ["Business Name", str(payload.business_name)],
-        ["Full Name", str(payload.full_name)],
-        ["Email", str(payload.email)],
-        ["Phone", str(payload.phone)],
-        ["Monthly Revenue", str(payload.monthly_revenue_range)],
-        ["Funding Needed", str(payload.funding_needed_range)],
-      ],
-      ownerPdf: [["Purpose of Funding", str(payload.purpose)]],
-      headline,
-      signature: str(payload.full_name),
-      signatureDate: new Date().toLocaleDateString("en-US"),
-    };
-  }
+  const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;padding:32px 12px">
+  <tr><td align="center">
+    <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.08)">
+      <tr><td style="background:linear-gradient(135deg, ${NAVY} 0%, #0f2339 100%);padding:28px 32px;color:#ffffff">
+        <div style="font-size:11px;letter-spacing:1.4px;text-transform:uppercase;opacity:0.75">Bayview Advance</div>
+        <div style="font-size:20px;font-weight:700;margin-top:4px">Funding Application</div>
+        <div style="font-size:14px;opacity:0.85;font-style:italic;margin-top:2px">Funding Made Simple</div>
+      </td></tr>
+      <tr><td style="padding:32px">
+        <div style="font-size:22px;font-weight:700;color:${NAVY};line-height:1.3">New application received</div>
+        <div style="margin-top:6px;font-size:15px;color:#334155;line-height:1.5">
+          A new funding application was submitted by <strong style="color:#0f172a">${escapeHtml(headline)}</strong>.
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:${SLATE}">Submitted ${escapeHtml(submittedAt)}</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:20px;background:${SLATE_LIGHT};border-radius:8px;overflow:hidden">
+          ${rows}
+        </table>
+      </td></tr>
+      <tr><td style="background:${SLATE_LIGHT};padding:18px 32px;border-top:1px solid #cbd5e1;color:${SLATE};font-size:12px;line-height:1.5">
+        Bayview Advance &middot; Funding Made Simple<br />
+        Reply directly to this email to reach the applicant.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
 
-  // Full application
-  const headline = str(payload.legal_business_name) || "Unknown Business";
-  const businessFields: FieldPair[] = [
-    ["Legal Business Name", str(payload.legal_business_name)],
-    ["DBA", str(payload.dba)],
-    ["Business Start Date", str(payload.business_start_date)],
-    ["Business Address", str(payload.business_address)],
-    ["Entity Type", str(payload.entity_type)],
-    ["State Incorporated", str(payload.state_incorporated)],
-    ["Federal Tax ID (EIN)", str(payload.ein)],
-    ["Industry", str(payload.industry)],
-  ];
-  const ownerFields: FieldPair[] = [
-    ["Owner Name", str(payload.owner_name)],
-    ["Ownership", str(payload.ownership)],
-    ["Date of Birth", str(payload.date_of_birth)],
-    ["SSN", str(payload.ssn)],
-    ["Home Address", str(payload.home_address)],
-  ];
-  if (payload.rep) ownerFields.push(["Rep", str(payload.rep)]);
+  const replyTo = typeof payload.email === "string" && payload.email ? payload.email : undefined;
 
   return {
-    email: [
-      {
-        heading: "Business Information",
-        fields: businessFields.map(([label, value]) => ({ label, value })),
-      },
-      {
-        heading: "Owner Information",
-        fields: ownerFields.map(([label, value]) => ({ label, value })),
-      },
-    ],
-    businessPdf: businessFields,
-    ownerPdf: ownerFields,
-    headline,
-    signature: str(payload.owner_signature),
-    signatureDate: str(payload.signature_date) || new Date().toLocaleDateString("en-US"),
+    subject: `New Bayview Advance application: ${headline}`,
+    html,
+    replyTo,
   };
 }
 
@@ -130,56 +121,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "RESEND_API_KEY is not configured" });
   }
 
-  const toEmail = process.env.APPLICATION_TO_EMAIL ?? "submissions@bayviewadvance.com";
   const fromEmail =
     process.env.APPLICATION_FROM_EMAIL ??
     "Bayview Advance <applications@bayviewadvance.com>";
-
-  const payload = (req.body ?? {}) as Payload;
-  const host = getHost(req);
-  const logoUrl = `${host.startsWith("localhost") ? "http" : "https"}://${host}/lovable-uploads/new-logo.png`;
-
-  const sections = buildSections(payload);
-  const submittedAt = new Date().toLocaleString("en-US", {
-    dateStyle: "long",
-    timeStyle: "short",
-    timeZone: "America/New_York",
-  }) + " ET";
-
-  const html = renderApplicationEmail({
-    preheader: `New application from ${sections.headline}`,
-    headlineBusiness: sections.headline,
-    submittedAt,
-    sections: sections.email,
-    logoUrl,
-  });
-
-  let pdfAttachment: { filename: string; content: string } | undefined;
-  try {
-    const { generateApplicationPdf } = await import("./_lib/pdf");
-    const logoBuffer = await fetchLogo(host);
-    const pdfBuffer = await generateApplicationPdf({
-      businessFields: sections.businessPdf,
-      ownerFields: sections.ownerPdf,
-      disclaimer: DISCLAIMER,
-      signature: sections.signature,
-      signatureDate: sections.signatureDate,
-      logo: logoBuffer,
-    });
-    const safeName = sections.headline.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-    pdfAttachment = {
-      filename: `bayview-advance-application-${safeName || "submission"}.pdf`,
-      content: pdfBuffer.toString("base64"),
-    };
-  } catch (err) {
-    console.error("PDF generation failed, sending without attachment:", err);
-    // Send email without PDF if generation fails
-  }
-
-  const replyTo = typeof payload.email === "string" ? payload.email : undefined;
-  const subject = `New Bayview Advance application: ${sections.headline}`;
+  const toEmail = process.env.APPLICATION_TO_EMAIL ?? "submissions@bayviewadvance.com";
 
   try {
+    const payload = (req.body ?? {}) as Record<string, unknown>;
+    const { subject, html, replyTo } = buildEmail(payload);
+
     const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({
       from: fromEmail,
@@ -187,7 +137,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       replyTo,
       subject,
       html,
-      attachments: pdfAttachment ? [pdfAttachment] : undefined,
     });
 
     if (error) {
@@ -197,7 +146,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ success: true, id: data?.id });
   } catch (err) {
-    console.error("send-application-email error:", err);
-    return res.status(500).json({ error: String(err) });
+    console.error("send-application-email crash:", err);
+    return res.status(500).json({
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
