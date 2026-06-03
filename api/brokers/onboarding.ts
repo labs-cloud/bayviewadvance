@@ -175,8 +175,16 @@ export default async function handler(req: JsonRequest, res: JsonResponse) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || "Bayview Advance <onboarding@bayviewadvance.com>",
-        to: [process.env.BROKER_ONBOARDING_EMAIL || process.env.NOTIFICATION_EMAIL || "labs@optentia.com"],
+        from:
+          process.env.EMAIL_FROM ||
+          process.env.APPLICATION_FROM_EMAIL ||
+          "Bayview Advance <onboarding@bayviewadvance.com>",
+        to: [
+          process.env.BROKER_ONBOARDING_EMAIL ||
+            process.env.NOTIFICATION_EMAIL ||
+            process.env.APPLICATION_TO_EMAIL ||
+            "labs@optentia.com",
+        ],
         subject: `New Bayview Broker Onboarding: ${fullName}`,
         html: emailLayout("New Bayview Broker Onboarding", fullName, bodyHtml),
         attachments,
