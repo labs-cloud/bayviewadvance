@@ -16,7 +16,7 @@ import "./BrokerOnboarding.css";
 
 type Step = 1 | 2 | 3 | 4;
 type Status = "idle" | "submitting" | "success" | "error";
-type UploadKey = "w9" | "id" | "voidedCheck" | "brokerAgreement" | "other";
+type UploadKey = "w9" | "id" | "voidedCheck" | "other";
 
 type EncodedFile = {
   name: string;
@@ -79,34 +79,72 @@ const uploadLabels: Record<UploadKey, string> = {
   w9: "W-9 / 1099 tax form",
   id: "Government ID",
   voidedCheck: "Voided check or bank letter",
-  brokerAgreement: "Broker agreement or license",
   other: "Other supporting file",
 };
 
-const ndaSections = [
+const ndaSections: { title: string; body: string[] }[] = [
   {
     title: "Purpose",
-    body: "This Agreement protects Bayview Advance confidential information, proprietary systems, client and referral relationships, and goodwill. Broker acknowledges they are an independent contractor and not an employee, partner, or agent of the Company.",
+    body: [
+      "The purpose of this Agreement is to protect the Company's legitimate business interests, including its confidential information, proprietary systems, client and referral relationships, and goodwill developed through the Company's investment of time and resources. For purposes of this Agreement, references to the Company shall include its affiliates, subsidiaries, officers, and assigns, and the term Broker shall include any entity or individual acting on behalf of the Broker.",
+      "This Agreement sets forth the Broker's obligations concerning the protection of such interests, including duties of confidentiality, non-solicitation, and limited non-competition, each of which is intended to be reasonable and necessary for the fair protection of the Company's business. The parties acknowledge that the Broker is an independent contractor and not an employee, partner, or agent of the Company, and nothing in this Agreement shall be construed to create any employment relationship.",
+    ],
   },
   {
     title: "Confidential Information",
-    body: "Broker will have access to confidential and proprietary information, including client and referral lists, leads, pricing and commission structures, marketing materials, scripts, training systems, business strategies, financial data, and technology platforms. Broker agrees not to disclose, copy, retain, or use that information outside Company business.",
+    body: [
+      "Broker acknowledges that, during the course of their engagement, they will have access to the Company's confidential and proprietary information, including but not limited to client and referral lists, leads, pricing and commission structures, marketing materials, scripts, training systems, business strategies, financial data, and technology platforms (collectively, Confidential Information). Broker agrees that they shall not, during or after their engagement, directly or indirectly disclose, copy, retain, or use any Confidential Information for any purpose other than in furtherance of the Company's business. The obligations under this section shall not apply to information that becomes public through no fault of the Broker.",
+    ],
   },
   {
     title: "Non-Solicitation",
-    body: "During the Agreement and for twelve months after termination, Broker will not directly or indirectly solicit Company clients, prospective clients, referral sources, employees, contractors, or vendors in a way that competes with or harms the Company relationship.",
+    body: [
+      "During the term of this Agreement and for a period of twelve (12) months following the termination of Broker's engagement, Broker shall not, directly or indirectly, solicit or attempt to solicit any client, prospective client, or referral source with whom the Broker had material contact through the Company, for the purpose of providing products or services that compete with those offered by the Company. Broker shall likewise not solicit or induce any employee, contractor, or vendor of the Company to terminate or reduce their relationship with the Company.",
+    ],
   },
   {
     title: "Non-Competition",
-    body: "For twelve months after termination, Broker will not, without prior written consent, engage in substantially similar competitive services in the merchant cash-advance or alternative funding industry where Broker performed services for the Company, except as allowed in the Agreement.",
+    body: [
+      "For a period of twelve (12) months following the termination of Broker's engagement, Broker shall not, without the Company's prior written consent, directly or indirectly engage in, own, manage, operate, or provide services to any business that competes with the Company in the merchant cash-advance or alternative funding industry within the geographic area in which the Broker performed services for the Company.",
+      "This restriction applies only to activities that are the same as or substantially similar to those the Broker performed for the Company and only to the extent necessary to protect the Company's confidential information and goodwill. Nothing in this Section shall prevent the Broker from earning a livelihood in a non-competitive capacity or from owning stock, shares, or equity of any publicly traded company.",
+    ],
   },
   {
-    title: "Return of Materials, Remedies, Law",
-    body: "Broker must return or delete Company property and materials at termination. Bayview Advance may seek injunctive relief for breach. The Agreement is governed by New York law, with venue in Kings County, New York.",
+    title: "Return of Materials",
+    body: [
+      "Upon termination of Broker's engagement for any reason, Broker shall immediately return to the Company all property, records, and materials belonging to the Company, whether in physical or electronic form, including but not limited to client and lead information, data, scripts, marketing materials, access credentials, and any copies thereof. Broker further agrees to permanently delete all such materials from any personal devices, accounts, or storage systems and, upon request, certify in writing that all Company materials have been returned or deleted.",
+    ],
+  },
+  {
+    title: "Remedies",
+    body: [
+      "Broker acknowledges that a breach or threatened breach of this Agreement may cause the Company irreparable harm for which monetary damages would be inadequate. Accordingly, the Company shall be entitled, in addition to any other remedies available at law or in equity, to seek temporary, preliminary, and permanent injunctive relief to prevent or restrain any such breach, without the necessity of posting a bond. Nothing in this Agreement shall limit the Company's right to pursue monetary damages or any other relief as may be appropriate.",
+    ],
+  },
+  {
+    title: "Governing Law",
+    body: [
+      "This Agreement shall be governed by, and construed in accordance with, the laws of the State of New York, without regard to its conflict of laws principles. Any dispute arising out of or relating to this Agreement shall be brought exclusively in the state or federal courts located in Kings County (Brooklyn), New York, and each party hereby consents to the personal jurisdiction and venue of such courts.",
+    ],
+  },
+  {
+    title: "Entire Agreement",
+    body: [
+      "This Agreement constitutes the entire understanding between the parties with respect to the subject matter hereof and supersedes all prior and contemporaneous agreements, representations, or understandings, whether oral or written. No modification or waiver of any provision of this Agreement shall be effective unless in writing and signed by both parties.",
+    ],
+  },
+  {
+    title: "Miscellaneous",
+    body: [
+      "This Agreement may be executed in one or more counterparts, each of which shall be deemed an original and all of which together shall constitute one and the same instrument. Signatures delivered electronically, including via DocuSign or other recognized electronic signature platform, or by scanned copy, shall be deemed to have the same force and effect as original signatures.",
+      "No presumption or inference shall be drawn against either party based on the drafting of this Agreement. Each party acknowledges that they have had the opportunity to review this Agreement and to seek the advice of independent legal counsel before signing. If any provision of this Agreement is held to be invalid or unenforceable, such provision shall be limited or modified to the minimum extent necessary to make it enforceable, and the remaining provisions shall remain in full force and effect.",
+    ],
   },
   {
     title: "Acknowledgment",
-    body: "Broker acknowledges the restrictions are reasonable and necessary to protect Bayview Advance legitimate business interests and that Broker has had the opportunity to review the Agreement and seek independent legal counsel before signing.",
+    body: [
+      "Broker acknowledges that the restrictions in this Agreement are reasonable and necessary to protect the Company's legitimate business interests, and that Broker has received adequate consideration in exchange for entering into this Agreement.",
+    ],
   },
 ];
 
@@ -133,7 +171,6 @@ export default function BrokerOnboarding() {
     w9: null,
     id: null,
     voidedCheck: null,
-    brokerAgreement: null,
     other: null,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -191,6 +228,7 @@ export default function BrokerOnboarding() {
 
     if (targetStep === 3) {
       if (!files.w9) nextErrors.w9 = "W-9 / 1099 tax form is required";
+      if (!files.id) nextErrors.id = "Government ID is required";
       if (!files.voidedCheck) nextErrors.voidedCheck = "Bank verification is required";
     }
 
@@ -366,12 +404,23 @@ export default function BrokerOnboarding() {
             </a>
             <div className="broker-agreement">
               <h2>Non-Disclosure, Non-Compete & Non-Solicitation Agreement</h2>
+              <p className="broker-agreement-intro">
+                This Agreement is made and entered into on the date of electronic signature by and
+                between Bayview Advance and the undersigned broker.
+              </p>
               {ndaSections.map((section) => (
                 <article key={section.title}>
                   <h3>{section.title}</h3>
-                  <p>{section.body}</p>
+                  {section.body.map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
                 </article>
               ))}
+              <div className="broker-agreement-signature-preview">
+                <strong>Broker:</strong> {form.signatureName || "Pending signature"}
+                <br />
+                <strong>Date:</strong> Completed when submitted
+              </div>
             </div>
             <Field label="Typed legal name" value={form.signatureName} onChange={(value) => setField("signatureName", value)} error={errors.signatureName} required wide />
             <SignaturePad value={form.signature} onChange={(value) => setField("signature", value)} error={errors.signature} />

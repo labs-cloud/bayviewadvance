@@ -295,6 +295,12 @@
   font-size: 18px;
 }
 
+.broker-agreement-intro {
+  margin-bottom: 14px;
+  color: #294157;
+  font-weight: 700;
+}
+
 .broker-agreement article {
   margin-bottom: 14px;
 }
@@ -305,8 +311,16 @@
 }
 
 .broker-agreement p {
-  margin: 0;
+  margin: 0 0 8px;
   color: #53677b;
+}
+
+.broker-agreement-signature-preview {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #d7e0ea;
+  color: #294157;
+  line-height: 1.8;
 }
 
 .broker-signature {
