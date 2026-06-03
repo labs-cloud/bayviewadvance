@@ -13,6 +13,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import ThankYou from "./pages/ThankYou";
 import Services from "./pages/Services";
+import BrokerOnboarding from "./pages/BrokerOnboarding";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/thank-you" element={<ThankYou />} />
           <Route path="/services" element={<Services />} />
+          <Route path="/brokers/onboarding" element={<BrokerOnboarding />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
