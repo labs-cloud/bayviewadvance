@@ -376,7 +376,7 @@ async function generateNdaPdf(
     y -= 4;
   }
 
-  // Signature block — keep it together on one page.
+  // Signature block ‚Äî keep it together on one page.
   ensure(130);
   y -= 12;
 
@@ -443,9 +443,76 @@ function base64Url(input: Buffer | string): string {
     .replace(/=+$/, "");
 }
 
-// Mints a short-lived Google API access token from a service account using the
-// JWT-bearer grant. Returns null when Google integration is not configured.
+// ‚îÄ‚îÄ‚îÄ Google Auth ‚Äî Workload Identity Federation ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// Exchanges the Vercel-issued OIDC token for a Google service-account access
+// token via WIF. No private key is stored anywhere ‚Äî just the SA email.
+async function getGoogleTokenViaWif(oidcToken: string, scope: string): Promise<string | null> {
+  const audience =
+    process.env.GOOGLE_WIF_AUDIENCE ||
+    "//iam.googleapis.com/projects/158413387618/locations/global/workloadIdentityPools/vercel/providers/vercel";
+  const serviceAccountEmail =
+    process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ||
+    "bayview-onboarding@grounded-block-499021-d1.iam.gserviceaccount.com";
+
+  // Step 1 ‚Äî swap Vercel OIDC JWT for a Google STS federated token
+  const stsRes = await fetch("https://sts.googleapis.com/v1/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+      audience,
+      scope: "https://www.googleapis.com/auth/cloud-platform",
+      requested_token_type: "urn:ietf:params:oauth:token-type:access_token",
+      subject_token: oidcToken,
+      subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
+    }),
+  });
+  if (!stsRes.ok) {
+    console.error(
+      "[broker-onboarding] WIF STS exchange failed",
+      stsRes.status,
+      await stsRes.text().catch(() => ""),
+    );
+    return null;
+  }
+  const { access_token: stsToken } = (await stsRes.json()) as { access_token: string };
+
+  // Step 2 ‚Äî use the federated token to impersonate the service account
+  const impRes = await fetch(
+    `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${serviceAccountEmail}:generateAccessToken`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${stsToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ scope: scope.split(" ") }),
+    },
+  );
+  if (!impRes.ok) {
+    console.error(
+      "[broker-onboarding] service account impersonation failed",
+      impRes.status,
+      await impRes.text().catch(() => ""),
+    );
+    return null;
+  }
+  const { accessToken } = (await impRes.json()) as { accessToken: string };
+  return accessToken;
+}
+
+// Mints a short-lived Google API access token.
+// Prefers Workload Identity Federation (VERCEL_OIDC_TOKEN ‚Äî no private key
+// stored) and falls back to the legacy JWT-bearer approach when
+// GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY is also present.
 async function getGoogleAccessToken(scope: string): Promise<string | null> {
+  // --- WIF path (preferred ‚Äî no private key required) ---
+  const oidcToken = process.env.VERCEL_OIDC_TOKEN;
+  if (oidcToken) {
+    return getGoogleTokenViaWif(oidcToken, scope);
+  }
+
+  // --- Legacy JWT-bearer path (fallback) ---
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
   if (!email || !rawKey) return null;
@@ -638,7 +705,7 @@ async function logBrokerToSheet(body: SubmissionBody, fullName: string, ndaPdf: 
       String(body.email || ""), // Email
       "Pending", // Status
       "", // Close Account (filled in manually by ops)
-      documentsLink, // Documents (Drive) — folder with the NDA and uploaded files
+      documentsLink, // Documents (Drive) ‚Äî folder with the NDA and uploaded files
       String(body.notes || ""), // Notes
     ]);
   } catch (err) {
@@ -801,7 +868,7 @@ export default async function handler(req: JsonRequest, res: JsonResponse) {
     }
 
     // Record the broker in the tracking sheet and archive their documents to
-    // Drive (non-blocking — never fails the submission).
+    // Drive (non-blocking ‚Äî never fails the submission).
     await logBrokerToSheet(body, fullName, ndaPdf);
 
     return res.status(200).json({ success: true });
