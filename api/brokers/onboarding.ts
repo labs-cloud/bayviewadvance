@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 type UploadedFile = {
   name: string;
@@ -282,6 +283,158 @@ function signedNdaHtml(body: SubmissionBody, fullName: string, submittedAt: stri
 </html>`;
 }
 
+// Renders the full signed NDA (sections 1-12 + the broker's drawn signature)
+// as a print-ready PDF so the email carries an actual signed document.
+async function generateNdaPdf(
+  body: SubmissionBody,
+  fullName: string,
+  agreementDate: string,
+  submittedAt: string,
+): Promise<Buffer> {
+  const pdf = await PDFDocument.create();
+  const reg = await pdf.embedFont(StandardFonts.TimesRoman);
+  const bold = await pdf.embedFont(StandardFonts.TimesRomanBold);
+
+  const PAGE_W = 612;
+  const PAGE_H = 792;
+  const M = 56;
+  const CW = PAGE_W - M * 2;
+  const NAVY = rgb(16 / 255, 32 / 255, 51 / 255);
+  const INK = rgb(17 / 255, 17 / 255, 17 / 255);
+  const SLATE = rgb(85 / 255, 85 / 255, 85 / 255);
+  const RULE = rgb(17 / 255, 17 / 255, 17 / 255);
+
+  let page = pdf.addPage([PAGE_W, PAGE_H]);
+  let y = PAGE_H - M;
+
+  const newPage = () => {
+    page = pdf.addPage([PAGE_W, PAGE_H]);
+    y = PAGE_H - M;
+  };
+  const ensure = (height: number) => {
+    if (y - height < M) newPage();
+  };
+
+  const wrap = (text: string, font: typeof reg, size: number, max: number): string[] => {
+    const lines: string[] = [];
+    for (const rawLine of text.split("\n")) {
+      const words = rawLine.split(/\s+/).filter(Boolean);
+      let cur = "";
+      for (const w of words) {
+        const test = cur ? `${cur} ${w}` : w;
+        if (font.widthOfTextAtSize(test, size) <= max) cur = test;
+        else {
+          if (cur) lines.push(cur);
+          cur = w;
+        }
+      }
+      lines.push(cur);
+    }
+    return lines;
+  };
+
+  const drawParagraph = (
+    text: string,
+    font: typeof reg,
+    size: number,
+    indent = 0,
+    gapAfter = 8,
+    color = INK,
+  ) => {
+    for (const line of wrap(text, font, size, CW - indent)) {
+      ensure(size + 3);
+      page.drawText(line, { x: M + indent, y, size, font, color });
+      y -= size + 3;
+    }
+    y -= gapAfter;
+  };
+
+  // Title
+  for (const t of ["NON-DISCLOSURE, NON-COMPETE &", "NON-SOLICITATION AGREEMENT"]) {
+    const w = bold.widthOfTextAtSize(t, 13);
+    page.drawText(t, { x: M + (CW - w) / 2, y, size: 13, font: bold, color: NAVY });
+    y -= 18;
+  }
+  y -= 12;
+
+  drawParagraph(
+    `This Agreement (the "Agreement") is made and entered into on ${agreementDate}, by and between ` +
+      `Bayview Advance ("Company") and the undersigned broker ("Broker").`,
+    reg,
+    11,
+    0,
+    14,
+  );
+
+  for (const section of agreementSections) {
+    ensure(30);
+    page.drawText(section.title, { x: M, y, size: 11, font: bold, color: NAVY });
+    y -= 16;
+    for (const para of section.body) {
+      drawParagraph(para, reg, 10.5, 14, 8);
+    }
+    y -= 4;
+  }
+
+  // Signature block — keep it together on one page.
+  ensure(130);
+  y -= 12;
+
+  if (body.signature?.content) {
+    try {
+      const img = await pdf.embedPng(Buffer.from(body.signature.content, "base64"));
+      const dims = img.scaleToFit(200, 56);
+      page.drawImage(img, { x: M, y: y - dims.height, width: dims.width, height: dims.height });
+      y -= dims.height;
+    } catch (err) {
+      console.error("[broker-onboarding] could not embed signature image", err);
+    }
+  }
+
+  const colW = (CW - 24) / 2;
+  page.drawLine({ start: { x: M, y }, end: { x: M + colW, y }, thickness: 0.5, color: RULE });
+  page.drawLine({
+    start: { x: M + colW + 24, y },
+    end: { x: M + CW, y },
+    thickness: 0.5,
+    color: RULE,
+  });
+  y -= 12;
+  page.drawText("Broker Signature", { x: M, y, size: 9, font: reg, color: SLATE });
+  page.drawText(String(body.signatureName || fullName), {
+    x: M + colW + 24,
+    y,
+    size: 11,
+    font: reg,
+    color: INK,
+  });
+  y -= 26;
+
+  page.drawLine({ start: { x: M, y }, end: { x: M + colW, y }, thickness: 0.5, color: RULE });
+  page.drawLine({
+    start: { x: M + colW + 24, y },
+    end: { x: M + CW, y },
+    thickness: 0.5,
+    color: RULE,
+  });
+  y -= 12;
+  page.drawText("Printed Name", { x: M, y, size: 9, font: reg, color: SLATE });
+  page.drawText("Date", { x: M + colW + 24, y, size: 9, font: reg, color: SLATE });
+  page.drawText(String(body.signatureName || fullName), { x: M, y: y + 14, size: 11, font: reg, color: INK });
+  page.drawText(agreementDate, { x: M + colW + 24, y: y + 14, size: 11, font: reg, color: INK });
+  y -= 14;
+
+  if (body.companyName) {
+    y -= 10;
+    page.drawText(`Company / DBA: ${String(body.companyName)}`, { x: M, y, size: 9, font: reg, color: SLATE });
+    y -= 12;
+  }
+  page.drawText(`Electronically submitted at ${submittedAt}.`, { x: M, y, size: 8, font: reg, color: SLATE });
+
+  const bytes = await pdf.save();
+  return Buffer.from(bytes);
+}
+
 function base64Url(input: Buffer | string): string {
   return Buffer.from(input)
     .toString("base64")
@@ -329,24 +482,48 @@ async function getGoogleAccessToken(scope: string): Promise<string | null> {
   return data.access_token || null;
 }
 
-// Uploads the signed NDA HTML to Drive as a Google Doc and returns a view link.
-async function uploadNdaToDrive(token: string, name: string, html: string): Promise<string> {
-  const folderId = process.env.BROKERS_NDA_FOLDER_ID;
-  const metadata: Record<string, unknown> = {
-    name,
-    mimeType: "application/vnd.google-apps.document",
-  };
-  if (folderId) metadata.parents = [folderId];
+type DriveFile = { id?: string; webViewLink?: string };
 
-  const boundary = `bayview-${Date.now()}`;
-  const body =
+// Creates a Drive folder and returns its id + view link.
+async function driveCreateFolder(token: string, name: string, parentId?: string): Promise<DriveFile> {
+  const metadata: Record<string, unknown> = { name, mimeType: "application/vnd.google-apps.folder" };
+  if (parentId) metadata.parents = [parentId];
+  const res = await fetch(
+    "https://www.googleapis.com/drive/v3/files?fields=id,webViewLink&supportsAllDrives=true",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(metadata),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Drive folder create failed: ${res.status} ${await res.text().catch(() => "")}`);
+  }
+  return (await res.json()) as DriveFile;
+}
+
+// Uploads a single binary file into Drive via a multipart/related request.
+async function driveUploadFile(
+  token: string,
+  name: string,
+  contentType: string,
+  content: Buffer,
+  parentId?: string,
+): Promise<DriveFile> {
+  const metadata: Record<string, unknown> = { name };
+  if (parentId) metadata.parents = [parentId];
+
+  const boundary = `bayview-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const pre = Buffer.from(
     `--${boundary}\r\n` +
-    "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
-    `${JSON.stringify(metadata)}\r\n` +
-    `--${boundary}\r\n` +
-    "Content-Type: text/html; charset=UTF-8\r\n\r\n" +
-    `${html}\r\n` +
-    `--${boundary}--`;
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+      `${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Type: ${contentType}\r\n\r\n`,
+    "utf-8",
+  );
+  const post = Buffer.from(`\r\n--${boundary}--`, "utf-8");
+  const bodyBuf = Buffer.concat([pre, content, post]);
 
   const res = await fetch(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink&supportsAllDrives=true",
@@ -356,25 +533,63 @@ async function uploadNdaToDrive(token: string, name: string, html: string): Prom
         Authorization: `Bearer ${token}`,
         "Content-Type": `multipart/related; boundary=${boundary}`,
       },
-      body,
+      body: bodyBuf,
     },
   );
   if (!res.ok) {
     throw new Error(`Drive upload failed: ${res.status} ${await res.text().catch(() => "")}`);
   }
-  const file = (await res.json()) as { id?: string; webViewLink?: string };
+  return (await res.json()) as DriveFile;
+}
 
-  // Optionally grant the whole Workspace domain read access to the NDA.
+// Creates a per-broker subfolder under the shared documents folder and uploads
+// the signed NDA plus every document the broker submitted. Returns a link to
+// that folder.
+async function uploadBrokerDocuments(
+  token: string,
+  body: SubmissionBody,
+  fullName: string,
+  dateLabel: string,
+  ndaPdf: Buffer | null,
+): Promise<string> {
+  const parentId = process.env.BROKERS_DRIVE_FOLDER_ID || process.env.BROKERS_NDA_FOLDER_ID;
+  const folder = await driveCreateFolder(token, `${dateLabel} - ${fullName}`, parentId);
+  const folderId = folder.id;
+
+  const uploads: Promise<unknown>[] = [];
+  if (ndaPdf) {
+    uploads.push(
+      driveUploadFile(token, `Signed NDA - ${fullName}.pdf`, "application/pdf", ndaPdf, folderId),
+    );
+  }
+  for (const [key, file] of Object.entries(body.files || {})) {
+    if (!file?.data) continue;
+    const ext = file.name.match(/\.[a-z0-9]+$/i)?.[0] || "";
+    const label = fileLabels[key] || key;
+    const buf = Buffer.from(base64FromDataUri(file.data), "base64");
+    uploads.push(
+      driveUploadFile(
+        token,
+        `${label} - ${fullName}${ext}`.replace(/[\\/]/g, "-"),
+        file.type || "application/octet-stream",
+        buf,
+        folderId,
+      ),
+    );
+  }
+  await Promise.allSettled(uploads);
+
+  // Optionally grant the whole Workspace domain read access to the folder.
   const shareDomain = process.env.BROKERS_NDA_SHARE_DOMAIN;
-  if (file.id && shareDomain) {
-    await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}/permissions?supportsAllDrives=true`, {
+  if (folderId && shareDomain) {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}/permissions?supportsAllDrives=true`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ role: "reader", type: "domain", domain: shareDomain }),
-    }).catch((err) => console.error("[broker-onboarding] NDA share failed", err));
+    }).catch((err) => console.error("[broker-onboarding] folder share failed", err));
   }
 
-  return file.webViewLink || (file.id ? `https://drive.google.com/file/d/${file.id}/view` : "");
+  return folder.webViewLink || (folderId ? `https://drive.google.com/drive/folders/${folderId}` : "");
 }
 
 // Appends a row to the onboarded-brokers tracking sheet.
@@ -395,8 +610,9 @@ async function appendBrokerRow(token: string, values: string[]): Promise<void> {
 }
 
 // Logs a new broker to the tracking sheet with a Pending status and a link to
-// the signed NDA. Never throws: sheet logging must not block the submission.
-async function logBrokerToSheet(body: SubmissionBody, fullName: string, ndaHtml: string): Promise<void> {
+// the Drive folder holding their signed NDA and uploaded documents. Never
+// throws: sheet logging must not block the submission.
+async function logBrokerToSheet(body: SubmissionBody, fullName: string, ndaPdf: Buffer | null): Promise<void> {
   try {
     const token = await getGoogleAccessToken(
       "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive",
@@ -406,14 +622,15 @@ async function logBrokerToSheet(body: SubmissionBody, fullName: string, ndaHtml:
       return;
     }
 
-    let ndaLink = "";
+    const onboardedDate = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
+
+    let documentsLink = "";
     try {
-      ndaLink = await uploadNdaToDrive(token, `Signed NDA - ${fullName}`, ndaHtml);
+      documentsLink = await uploadBrokerDocuments(token, body, fullName, onboardedDate, ndaPdf);
     } catch (err) {
-      console.error("[broker-onboarding] NDA Drive upload failed", err);
+      console.error("[broker-onboarding] broker document upload failed", err);
     }
 
-    const onboardedDate = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
     await appendBrokerRow(token, [
       onboardedDate, // Date Onboarded
       fullName, // Name
@@ -421,7 +638,7 @@ async function logBrokerToSheet(body: SubmissionBody, fullName: string, ndaHtml:
       String(body.email || ""), // Email
       "Pending", // Status
       "", // Close Account (filled in manually by ops)
-      ndaLink, // Signed NDA
+      documentsLink, // Documents (Drive) — folder with the NDA and uploaded files
       String(body.notes || ""), // Notes
     ]);
   } catch (err) {
@@ -498,12 +715,26 @@ export default async function handler(req: JsonRequest, res: JsonResponse) {
 
     const fullName = `${body.firstName} ${body.lastName}`.trim();
     const submittedAt = new Date().toLocaleString("en-US", { timeZone: "America/New_York" }) + " ET";
-    const ndaHtml = signedNdaHtml(body, fullName, submittedAt);
-    attachments.unshift({
-      filename: `Signed Bayview NDA - ${fullName}.html`.replace(/[^\w.\- ()]/g, ""),
-      content: Buffer.from(ndaHtml).toString("base64"),
-      content_type: "text/html",
-    });
+    const agreementDate = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
+
+    // Attach the signed NDA as a real PDF; fall back to HTML only if PDF
+    // generation fails so the email always carries the agreement.
+    let ndaPdf: Buffer | null = null;
+    try {
+      ndaPdf = await generateNdaPdf(body, fullName, agreementDate, submittedAt);
+      attachments.unshift({
+        filename: `Signed Bayview NDA - ${fullName}.pdf`.replace(/[^\w.\- ()]/g, ""),
+        content: ndaPdf.toString("base64"),
+        content_type: "application/pdf",
+      });
+    } catch (err) {
+      console.error("[broker-onboarding] NDA PDF generation failed; attaching HTML instead", err);
+      attachments.unshift({
+        filename: `Signed Bayview NDA - ${fullName}.html`.replace(/[^\w.\- ()]/g, ""),
+        content: Buffer.from(signedNdaHtml(body, fullName, submittedAt)).toString("base64"),
+        content_type: "text/html",
+      });
+    }
 
     const bodyHtml = `
       <p style="margin-top:0;">A broker completed the Bayview Advance onboarding packet.</p>
@@ -569,8 +800,9 @@ export default async function handler(req: JsonRequest, res: JsonResponse) {
       return res.status(500).json({ error: "The submission could not be emailed. Please try again." });
     }
 
-    // Record the broker in the tracking sheet (non-blocking — never fails the submission).
-    await logBrokerToSheet(body, fullName, ndaHtml);
+    // Record the broker in the tracking sheet and archive their documents to
+    // Drive (non-blocking — never fails the submission).
+    await logBrokerToSheet(body, fullName, ndaPdf);
 
     return res.status(200).json({ success: true });
   } catch (error) {
