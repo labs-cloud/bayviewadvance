@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 type UploadedFile = {
   name: string;
   type: string;
@@ -280,6 +282,153 @@ function signedNdaHtml(body: SubmissionBody, fullName: string, submittedAt: stri
 </html>`;
 }
 
+function base64Url(input: Buffer | string): string {
+  return Buffer.from(input)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+// Mints a short-lived Google API access token from a service account using the
+// JWT-bearer grant. Returns null when Google integration is not configured.
+async function getGoogleAccessToken(scope: string): Promise<string | null> {
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+  if (!email || !rawKey) return null;
+
+  const privateKey = rawKey.replace(/\\n/g, "\n");
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claims = base64Url(
+    JSON.stringify({
+      iss: email,
+      scope,
+      aud: "https://oauth2.googleapis.com/token",
+      iat: now,
+      exp: now + 3600,
+    }),
+  );
+  const signingInput = `${header}.${claims}`;
+  const signature = base64Url(crypto.sign("RSA-SHA256", Buffer.from(signingInput), privateKey));
+  const assertion = `${signingInput}.${signature}`;
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+  });
+  if (!res.ok) {
+    console.error("[broker-onboarding] Google token request failed", res.status, await res.text().catch(() => ""));
+    return null;
+  }
+  const data = (await res.json()) as { access_token?: string };
+  return data.access_token || null;
+}
+
+// Uploads the signed NDA HTML to Drive as a Google Doc and returns a view link.
+async function uploadNdaToDrive(token: string, name: string, html: string): Promise<string> {
+  const folderId = process.env.BROKERS_NDA_FOLDER_ID;
+  const metadata: Record<string, unknown> = {
+    name,
+    mimeType: "application/vnd.google-apps.document",
+  };
+  if (folderId) metadata.parents = [folderId];
+
+  const boundary = `bayview-${Date.now()}`;
+  const body =
+    `--${boundary}\r\n` +
+    "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+    `${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\n` +
+    "Content-Type: text/html; charset=UTF-8\r\n\r\n" +
+    `${html}\r\n` +
+    `--${boundary}--`;
+
+  const res = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink&supportsAllDrives=true",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Drive upload failed: ${res.status} ${await res.text().catch(() => "")}`);
+  }
+  const file = (await res.json()) as { id?: string; webViewLink?: string };
+
+  // Optionally grant the whole Workspace domain read access to the NDA.
+  const shareDomain = process.env.BROKERS_NDA_SHARE_DOMAIN;
+  if (file.id && shareDomain) {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}/permissions?supportsAllDrives=true`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "reader", type: "domain", domain: shareDomain }),
+    }).catch((err) => console.error("[broker-onboarding] NDA share failed", err));
+  }
+
+  return file.webViewLink || (file.id ? `https://drive.google.com/file/d/${file.id}/view` : "");
+}
+
+// Appends a row to the onboarded-brokers tracking sheet.
+async function appendBrokerRow(token: string, values: string[]): Promise<void> {
+  const sheetId = process.env.BROKERS_SHEET_ID;
+  if (!sheetId) throw new Error("BROKERS_SHEET_ID is not set");
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ values: [values] }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Sheets append failed: ${res.status} ${await res.text().catch(() => "")}`);
+  }
+}
+
+// Logs a new broker to the tracking sheet with a Pending status and a link to
+// the signed NDA. Never throws: sheet logging must not block the submission.
+async function logBrokerToSheet(body: SubmissionBody, fullName: string, ndaHtml: string): Promise<void> {
+  try {
+    const token = await getGoogleAccessToken(
+      "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive",
+    );
+    if (!token) {
+      console.warn("[broker-onboarding] Google not configured; skipping broker sheet log");
+      return;
+    }
+
+    let ndaLink = "";
+    try {
+      ndaLink = await uploadNdaToDrive(token, `Signed NDA - ${fullName}`, ndaHtml);
+    } catch (err) {
+      console.error("[broker-onboarding] NDA Drive upload failed", err);
+    }
+
+    const onboardedDate = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
+    await appendBrokerRow(token, [
+      onboardedDate, // Date Onboarded
+      fullName, // Name
+      String(body.phone || ""), // Phone Number
+      String(body.email || ""), // Email
+      "Pending", // Status
+      "", // Close Account (filled in manually by ops)
+      ndaLink, // Signed NDA
+      String(body.notes || ""), // Notes
+    ]);
+  } catch (err) {
+    console.error("[broker-onboarding] broker sheet log failed", err);
+  }
+}
+
 export default async function handler(req: JsonRequest, res: JsonResponse) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -349,9 +498,10 @@ export default async function handler(req: JsonRequest, res: JsonResponse) {
 
     const fullName = `${body.firstName} ${body.lastName}`.trim();
     const submittedAt = new Date().toLocaleString("en-US", { timeZone: "America/New_York" }) + " ET";
+    const ndaHtml = signedNdaHtml(body, fullName, submittedAt);
     attachments.unshift({
       filename: `Signed Bayview NDA - ${fullName}.html`.replace(/[^\w.\- ()]/g, ""),
-      content: Buffer.from(signedNdaHtml(body, fullName, submittedAt)).toString("base64"),
+      content: Buffer.from(ndaHtml).toString("base64"),
       content_type: "text/html",
     });
 
@@ -418,6 +568,9 @@ export default async function handler(req: JsonRequest, res: JsonResponse) {
       console.error("[broker-onboarding] Resend rejected", resend.status, detail);
       return res.status(500).json({ error: "The submission could not be emailed. Please try again." });
     }
+
+    // Record the broker in the tracking sheet (non-blocking — never fails the submission).
+    await logBrokerToSheet(body, fullName, ndaHtml);
 
     return res.status(200).json({ success: true });
   } catch (error) {
