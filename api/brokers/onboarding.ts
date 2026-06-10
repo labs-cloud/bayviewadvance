@@ -106,6 +106,25 @@ const agreementSections: { title: string; body: string[] }[] = [
       "Broker acknowledges that the restrictions in this Agreement are reasonable and necessary to protect the Company's legitimate business interests, and that Broker has received adequate consideration in exchange for entering into this Agreement.",
     ],
   },
+  {
+    title: "11. Commission Structure",
+    body: [
+      "As consideration for Broker's services under this Agreement, the Company shall pay Broker commissions on funded deals in accordance with the following tiered schedule, based on cumulative funded volume during the term of Broker's engagement:",
+      "(a) Base Rate - 25% Commission: Broker shall earn a commission rate of twenty-five percent (25%) on all funded deals from the commencement of engagement.",
+      "(b) Tier 2 - 30% Commission: Upon Broker's cumulative funded volume reaching two hundred fifty thousand dollars ($250,000), the commission rate shall increase to thirty percent (30%) on all subsequent funded deals.",
+      "(c) Tier 3 - 35% Commission: Upon Broker's cumulative funded volume reaching four hundred fifty thousand dollars ($450,000), the commission rate shall further increase to thirty-five percent (35%) on all subsequent funded deals.",
+      "Commission thresholds are calculated on a cumulative basis. The Company reserves the right to adjust the commission schedule upon thirty (30) days' written notice to Broker, provided that no adjustment shall reduce commissions already earned on deals funded prior to such notice.",
+      "(d) Chargeback Upon Default: In the event that a merchant defaults on a funded deal and fails to satisfy its payment obligations to the Company, the Company shall have the right to recover (chargeback) all or a proportionate portion of the commission previously paid to Broker in connection with that deal. The chargeback amount shall be calculated based on the outstanding unpaid balance at the time of default. The Company may, at its sole discretion, deduct any such chargeback amount from future commissions owed to Broker or demand repayment directly. Broker acknowledges and agrees that commissions are earned only on successfully collected deals, and that this chargeback right is a material term of the compensation arrangement.",
+      "(e) Commission Payment Schedule: Commissions shall be paid on a weekly basis, every Thursday, for all deals funded during the preceding calendar week (Monday through Sunday). Payment shall be made via the Company's standard disbursement method. The Company reserves the right to withhold payment on any deal that is under review, subject to a pending chargeback, or otherwise disputed, pending resolution.",
+    ],
+  },
+  {
+    title: "12. Forfeiture and Waiver of Claims Upon Breach",
+    body: [
+      "In the event that Broker breaches any provision of this Agreement, including but not limited to the confidentiality, non-solicitation, or non-competition obligations set forth herein, Broker shall, upon the Company's determination of such breach: (i) immediately forfeit any and all unpaid commissions, compensation, or monies of any kind then owed or accrued by the Company to Broker, and Broker shall have no right to receive or collect any such amounts; and (ii) irrevocably waive, release, and relinquish any and all claims, rights, causes of action, demands, or legal proceedings of any kind against Bayview Advance, its affiliates, officers, directors, employees, and assigns, whether known or unknown, arising out of or related to Broker's engagement, this Agreement, or any compensation or commission allegedly owed.",
+      "Broker acknowledges that this forfeiture and waiver constitutes reasonable and agreed-upon liquidated damages in light of the difficulty of calculating the harm caused by a breach, and not a penalty. By signing this Agreement, Broker expressly agrees that, upon breach, Broker shall not initiate, pursue, or participate in any lawsuit, arbitration, administrative proceeding, or other legal action against the Company related to any withheld or forfeited compensation.",
+    ],
+  },
 ];
 
 function escapeHtml(value: unknown): string {
