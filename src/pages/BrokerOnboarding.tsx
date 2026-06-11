@@ -181,6 +181,52 @@ const readFile = (file: File): Promise<EncodedFile> =>
     reader.readAsDataURL(file);
   });
 
+// Vercel caps a serverless request body at ~4.5MB. Documents are sent base64
+// (≈33% larger) inside one JSON body, so keep the combined payload under this.
+const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
+
+// Downscale/re-encode photos before upload so a phone snapshot of an ID or
+// check doesn't blow past the request-size limit. Non-images pass through.
+const compressImage = (file: File): Promise<File> =>
+  new Promise((resolve) => {
+    if (!file.type.startsWith("image/")) {
+      resolve(file);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob || blob.size >= file.size) {
+            resolve(file);
+            return;
+          }
+          const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+          resolve(new File([blob], name, { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        0.72,
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+
 const dataUriToBase64 = (dataUri: string) => dataUri.split(",")[1] || dataUri;
 
 export default function BrokerOnboarding() {
@@ -274,11 +320,15 @@ export default function BrokerOnboarding() {
 
   const onFileChange = async (key: UploadKey, file?: File) => {
     if (!file) return;
-    if (file.size > 15 * 1024 * 1024) {
-      setErrors((prev) => ({ ...prev, [key]: "File must be 15MB or less" }));
+    const prepared = await compressImage(file);
+    if (prepared.size > MAX_PAYLOAD_BYTES) {
+      setErrors((prev) => ({
+        ...prev,
+        [key]: "File is too large (over 4MB). Upload a photo instead of a scan, or compress the PDF.",
+      }));
       return;
     }
-    const encoded = await readFile(file);
+    const encoded = await readFile(prepared);
     setFiles((prev) => ({ ...prev, [key]: encoded }));
     setErrors((prev) => {
       const next = { ...prev };
@@ -292,22 +342,49 @@ export default function BrokerOnboarding() {
     setStatus("submitting");
     setSubmitMessage("");
 
+    const payload = JSON.stringify({
+      ...form,
+      signature: {
+        filename: "broker-signature.png",
+        contentType: "image/png",
+        content: dataUriToBase64(form.signature),
+      },
+      files,
+    });
+
+    if (payload.length > MAX_PAYLOAD_BYTES) {
+      setStatus("error");
+      setSubmitMessage(
+        "Your documents are too large to submit together (over 4MB). Please re-upload smaller or compressed files and try again.",
+      );
+      return;
+    }
+
     try {
       const res = await fetch("/api/brokers/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          signature: {
-            filename: "broker-signature.png",
-            contentType: "image/png",
-            content: dataUriToBase64(form.signature),
-          },
-          files,
-        }),
+        body: payload,
       });
+
+      if (!res.ok) {
+        if (res.status === 413) {
+          throw new Error(
+            "Your documents are too large to submit (over 4MB). Please upload smaller or compressed files and try again.",
+          );
+        }
+        let message = `Submission failed (${res.status})`;
+        try {
+          const data = await res.json();
+          message = data.error || message;
+        } catch {
+          // Non-JSON error body (e.g. a platform error page) — keep the generic message.
+        }
+        throw new Error(message);
+      }
+
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || "Submission failed");
+      if (!data.success) throw new Error(data.error || "Submission failed");
       setStatus("success");
     } catch (err) {
       setStatus("error");
