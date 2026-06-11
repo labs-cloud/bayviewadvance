@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { ExternalAccountClient } from "google-auth-library";
+import { getVercelOidcToken } from "@vercel/functions/oidc";
 
 type UploadedFile = {
   name: string;
@@ -442,87 +444,50 @@ function base64Url(input: Buffer | string): string {
     .replace(/\//g, "_")
     .replace(/=+$/, "");
 }
-
-// ‚îÄ‚îÄ‚îÄ Google Auth ‚Äî Workload Identity Federation ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-// Exchanges the Vercel-issued OIDC token for a Google service-account access
-// token via WIF. No private key is stored anywhere ‚Äî just the SA email.
-async function getGoogleTokenViaWif(oidcToken: string, scope: string): Promise<string | null> {
-  const audience =
-    process.env.GOOGLE_WIF_AUDIENCE ||
-    "//iam.googleapis.com/projects/158413387618/locations/global/workloadIdentityPools/vercel/providers/vercel";
+// Mints a short-lived Google API access token via Workload Identity
+// Federation: a fresh Vercel OIDC token is exchanged at STS and used to
+// impersonate the service account. Falls back to a service-account private
+// key (JWT-bearer) only when GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY is set.
+async function getGoogleAccessToken(scope: string): Promise<string | null> {
   const serviceAccountEmail =
     process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ||
     "bayview-onboarding@grounded-block-499021-d1.iam.gserviceaccount.com";
+  const audience =
+    process.env.GOOGLE_WIF_AUDIENCE ||
+    "//iam.googleapis.com/projects/158413387618/locations/global/workloadIdentityPools/vercel/providers/vercel";
+  const scopes = scope.split(/\s+/).filter(Boolean);
 
-  // Step 1 ‚Äî swap Vercel OIDC JWT for a Google STS federated token
-  const stsRes = await fetch("https://sts.googleapis.com/v1/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+  // Preferred: Workload Identity Federation (no private key stored).
+  try {
+    const authClient = ExternalAccountClient.fromJSON({
+      type: "external_account",
       audience,
-      scope: "https://www.googleapis.com/auth/cloud-platform",
-      requested_token_type: "urn:ietf:params:oauth:token-type:access_token",
-      subject_token: oidcToken,
       subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
-    }),
-  });
-  if (!stsRes.ok) {
-    console.error(
-      "[broker-onboarding] WIF STS exchange failed",
-      stsRes.status,
-      await stsRes.text().catch(() => ""),
-    );
-    return null;
-  }
-  const { access_token: stsToken } = (await stsRes.json()) as { access_token: string };
-
-  // Step 2 ‚Äî use the federated token to impersonate the service account
-  const impRes = await fetch(
-    `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${serviceAccountEmail}:generateAccessToken`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${stsToken}`,
-        "Content-Type": "application/json",
+      token_url: "https://sts.googleapis.com/v1/token",
+      service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${serviceAccountEmail}:generateAccessToken`,
+      scopes,
+      subject_token_supplier: {
+        getSubjectToken: async () => getVercelOidcToken(),
       },
-      body: JSON.stringify({ scope: scope.split(" ") }),
-    },
-  );
-  if (!impRes.ok) {
-    console.error(
-      "[broker-onboarding] service account impersonation failed",
-      impRes.status,
-      await impRes.text().catch(() => ""),
-    );
-    return null;
-  }
-  const { accessToken } = (await impRes.json()) as { accessToken: string };
-  return accessToken;
-}
-
-// Mints a short-lived Google API access token.
-// Prefers Workload Identity Federation (VERCEL_OIDC_TOKEN ‚Äî no private key
-// stored) and falls back to the legacy JWT-bearer approach when
-// GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY is also present.
-async function getGoogleAccessToken(scope: string): Promise<string | null> {
-  // --- WIF path (preferred ‚Äî no private key required) ---
-  const oidcToken = process.env.VERCEL_OIDC_TOKEN;
-  if (oidcToken) {
-    return getGoogleTokenViaWif(oidcToken, scope);
+    });
+    if (authClient) {
+      const { token } = await authClient.getAccessToken();
+      if (token) return token;
+    }
+  } catch (err) {
+    console.error("[broker-onboarding] WIF token request failed", err);
   }
 
-  // --- Legacy JWT-bearer path (fallback) ---
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  // Fallback: service-account private key (JWT-bearer grant).
   const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
-  if (!email || !rawKey) return null;
+  if (!serviceAccountEmail || !rawKey) return null;
 
   const privateKey = rawKey.replace(/\\n/g, "\n");
   const now = Math.floor(Date.now() / 1000);
   const header = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claims = base64Url(
     JSON.stringify({
-      iss: email,
+      iss: serviceAccountEmail,
       scope,
       aud: "https://oauth2.googleapis.com/token",
       iat: now,

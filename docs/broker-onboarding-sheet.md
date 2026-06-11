@@ -27,30 +27,43 @@ Sheet columns: `Date Onboarded · Name · Phone Number · Email · Status · Clo
 - `Close Account` is left blank for ops to fill in manually.
 - `Documents (Drive)` links the broker's subfolder (NDA + all uploaded files).
 
-## Required setup (to turn it on)
+## Authentication — Workload Identity Federation (no key)
 
-The Drive/sheet automation stays dormant until a Google service account is
-configured (the PDF-in-email fix works without any of this):
+The function authenticates to Google via **Workload Identity Federation**
+using Vercel's OIDC integration — there is **no service-account private key**
+stored anywhere. At request time it fetches a fresh Vercel OIDC token
+(`getVercelOidcToken` from `@vercel/functions`), exchanges it at Google STS,
+and impersonates the service account (`google-auth-library`
+`ExternalAccountClient`). A private-key JWT path remains only as a fallback if
+`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` is ever set.
 
-1. In Google Cloud Console, create a **service account**; enable the
-   **Google Sheets API** and **Google Drive API**; create a **JSON key**.
-2. Share the documents folder (above) **and** the tracking sheet with the
+### Required setup (to turn it on)
+
+1. Enable the **Vercel ↔ Google Cloud** OIDC integration on the project (this
+   creates the workload identity pool/provider and injects the OIDC token).
+2. In Google Cloud, on the service account, grant the Vercel pool principal
+   the **Workload Identity User** role, and enable the **Google Sheets API**
+   and **Google Drive API**.
+3. Share the documents folder (above) **and** the tracking sheet with the
    service-account email as **Editor**. (Sharing the folder also shares the
    per-broker subfolders the function creates inside it.)
-3. Set these env vars in Vercel:
-   - `GOOGLE_SERVICE_ACCOUNT_EMAIL`
-   - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` (keep the `\n` escapes)
+4. Set these env vars in Vercel:
+   - `GOOGLE_SERVICE_ACCOUNT_EMAIL` — the SA that is bound to the pool **and**
+     shared on the sheet/folder (e.g.
+     `bayview-onboarding@grounded-block-499021-d1.iam.gserviceaccount.com`)
    - `BROKERS_SHEET_ID` = `1VmAp74B7Cm-YghuZKv-cImijVKSqQ5Xzk8QBCM8GfuE`
    - `BROKERS_DRIVE_FOLDER_ID` = `1sfqdk0gmeIgluCgCAc3-YoWfkWe-WYcx`
+   - `GOOGLE_WIF_AUDIENCE` (optional — defaults to the project's
+     `…/workloadIdentityPools/vercel/providers/vercel` audience)
    - `BROKERS_NDA_SHARE_DOMAIN` (optional — e.g. `optentia.com`, to grant the
      whole Workspace read access to each broker folder)
 
 > `BROKERS_NDA_FOLDER_ID` is still accepted as a fallback for
-> `BROKERS_DRIVE_FOLDER_ID`.
+> `BROKERS_DRIVE_FOLDER_ID`. No `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` is needed
+> for the WIF path.
 
 ## Open items
 
-- [ ] Service account + env vars not yet provisioned (above).
 - [ ] **End-to-end run untested** — submit one real onboarding after setup to
       confirm the subfolder, files, and sheet row appear.
 - [ ] **Folder sharing left at default** (per request): broker folders are only
