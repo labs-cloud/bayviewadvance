@@ -569,7 +569,9 @@ async function driveUploadFile(
     },
   );
   if (!res.ok) {
-    throw new Error(`Drive upload failed: ${res.status} ${await res.text().catch(() => "")}`);
+    const errBody = await res.text().catch(() => "");
+    console.error(`[broker-onboarding] Drive upload failed: ${res.status}`, errBody);
+    throw new Error(`Drive upload failed: ${res.status} ${errBody}`);
   }
   return (await res.json()) as DriveFile;
 }
@@ -609,7 +611,12 @@ async function uploadBrokerDocuments(
       ),
     );
   }
-  await Promise.allSettled(uploads);
+  const uploadResults = await Promise.allSettled(uploads);
+  for (const r of uploadResults) {
+    if (r.status === "rejected") {
+      console.error("[broker-onboarding] upload rejected:", r.reason?.message || r.reason);
+    }
+  }
 
   // Optionally grant the whole Workspace domain read access to the folder.
   const shareDomain = process.env.BROKERS_NDA_SHARE_DOMAIN;
