@@ -41,7 +41,7 @@ type FormState = {
   bankName: string;
   accountName: string;
   routingNumber: string;
-  accountLast4: string;
+  accountNumber: string;
   commissionEmail: string;
   referralSource: string;
   notes: string;
@@ -66,7 +66,7 @@ const initialForm: FormState = {
   bankName: "",
   accountName: "",
   routingNumber: "",
-  accountLast4: "",
+  accountNumber: "",
   commissionEmail: "",
   referralSource: "",
   notes: "",
@@ -282,12 +282,12 @@ export default function BrokerOnboarding() {
       required("bankName", "Bank name");
       required("accountName", "Account name");
       required("routingNumber", "Routing number");
-      required("accountLast4", "Account last 4");
+      required("accountNumber", "Account number");
       if (form.routingNumber && !/^\d{9}$/.test(form.routingNumber)) {
         nextErrors.routingNumber = "Routing number must be 9 digits";
       }
-      if (form.accountLast4 && !/^\d{4}$/.test(form.accountLast4)) {
-        nextErrors.accountLast4 = "Use the last 4 digits only";
+      if (form.accountNumber && !/^\d{4,17}$/.test(form.accountNumber)) {
+        nextErrors.accountNumber = "Enter a valid account number (4–17 digits)";
       }
     }
 
@@ -457,7 +457,7 @@ export default function BrokerOnboarding() {
             <Field label="Bank name" value={form.bankName} onChange={(value) => setField("bankName", value)} error={errors.bankName} required />
             <Field label="Account holder name" value={form.accountName} onChange={(value) => setField("accountName", value)} error={errors.accountName} required />
             <Field label="Routing number" value={form.routingNumber} onChange={(value) => setField("routingNumber", value.replace(/\D/g, "").slice(0, 9))} error={errors.routingNumber} required />
-            <Field label="Account last 4" value={form.accountLast4} onChange={(value) => setField("accountLast4", value.replace(/\D/g, "").slice(0, 4))} error={errors.accountLast4} required />
+            <Field label="Account number" value={form.accountNumber} onChange={(value) => setField("accountNumber", value.replace(/\D/g, "").slice(0, 17))} error={errors.accountNumber} required />
             <Field label="Commission notice email" type="email" value={form.commissionEmail} onChange={(value) => setField("commissionEmail", value)} />
           </div>
         )}

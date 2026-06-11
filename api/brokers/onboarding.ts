@@ -729,7 +729,7 @@ export default async function handler(req: JsonRequest, res: JsonResponse) {
       "bankName",
       "accountName",
       "routingNumber",
-      "accountLast4",
+      "accountNumber",
       "signatureName",
     ];
 
@@ -745,8 +745,8 @@ export default async function handler(req: JsonRequest, res: JsonResponse) {
     if (!/^\d{9}$/.test(String(body.routingNumber))) {
       return res.status(400).json({ error: "Routing number must be 9 digits" });
     }
-    if (!/^\d{4}$/.test(String(body.accountLast4))) {
-      return res.status(400).json({ error: "Account last 4 must be 4 digits" });
+    if (!/^\d{4,17}$/.test(String(body.accountNumber))) {
+      return res.status(400).json({ error: "Account number must be 4 to 17 digits" });
     }
     if (!body.agreed || !body.signature?.content) {
       return res.status(400).json({ error: "NDA signature and acknowledgment are required" });
@@ -823,7 +823,7 @@ export default async function handler(req: JsonRequest, res: JsonResponse) {
         ${row("Bank name", body.bankName)}
         ${row("Account name", body.accountName)}
         ${row("Routing number", body.routingNumber)}
-        ${row("Account last 4", body.accountLast4)}
+        ${row("Account number", body.accountNumber)}
         ${row("Commission email", body.commissionEmail)}
       </table>
 
