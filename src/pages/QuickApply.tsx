@@ -51,10 +51,10 @@ const QuickApply = () => {
       return;
     }
 
-    if (!formData.contactConsent || !formData.termsConsent) {
+    if (!formData.termsConsent) {
       toast({
         title: "Please accept the terms",
-        description: "You must agree to the terms and consent to be contacted.",
+        description: "You must agree to the Terms & Conditions and Privacy Policy to submit.",
         variant: "destructive",
       });
       return;
@@ -269,8 +269,10 @@ const QuickApply = () => {
                         onCheckedChange={(checked) => handleInputChange('contactConsent', checked === true)}
                       />
                       <Label htmlFor="contact-consent" className="text-sm leading-relaxed text-slate-600">
-                        By submitting this form, you agree to receive transaction messages from Bayview Advance. Text and data rates may apply. Message frequency varies. Reply STOP to unsubscribe or HELP for help. To view our privacy policy, go to{" "}
-                        <Link to="/privacy" className="text-[#2c4a6e] hover:underline">our privacy policy</Link>.
+                        (Optional) I agree to receive automated transactional text messages from Bayview Advance about my application, status, and appointments. Message frequency varies. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. See our{" "}
+                        <Link to="/terms" className="text-[#2c4a6e] hover:underline">Terms</Link>
+                        {" "}and{" "}
+                        <Link to="/privacy" className="text-[#2c4a6e] hover:underline">Privacy Policy</Link>. This consent is not required to submit your application.
                       </Label>
                     </div>
                     <div className="flex items-start space-x-3">
