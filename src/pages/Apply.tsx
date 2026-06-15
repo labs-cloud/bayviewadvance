@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
+import { REPS, findRep } from "@/data/reps";
+import { Upload, FileText, X } from "lucide-react";
 
 const US_STATES = [
   "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
@@ -37,9 +39,33 @@ type FormState = {
   ssn: string;
   homeAddress: string;
   ownership: string;
+  bankStatementMonths: string;
   signature: string;
   signatureDate: string;
 };
+
+type EncodedFile = { name: string; type: string; size: number; data: string };
+
+const STATEMENT_COUNT = 3;
+
+// Vercel caps a serverless request body at ~4.5MB. The three statements are
+// sent base64 (~33% larger) inside one JSON body, so keep the combined payload
+// comfortably under that ceiling.
+const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
+
+const readFile = (file: File): Promise<EncodedFile> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () =>
+      resolve({
+        name: file.name,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+        data: String(reader.result || ""),
+      });
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+    reader.readAsDataURL(file);
+  });
 
 const Apply = () => {
   const today = new Date().toISOString().slice(0, 10);
@@ -62,12 +88,41 @@ const Apply = () => {
     ssn: "",
     homeAddress: "",
     ownership: "single",
+    bankStatementMonths: "",
     signature: "",
     signatureDate: today,
   });
+  const [statements, setStatements] = useState<(EncodedFile | null)[]>(
+    Array(STATEMENT_COUNT).fill(null),
+  );
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  const setStatement = async (index: number, file?: File) => {
+    if (!file) return;
+    if (file.size > MAX_PAYLOAD_BYTES) {
+      toast({
+        title: "File too large",
+        description: `${file.name} is over 4MB. Please upload a smaller or compressed PDF.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    const encoded = await readFile(file);
+    setStatements((prev) => {
+      const next = [...prev];
+      next[index] = encoded;
+      return next;
+    });
+  };
+
+  const removeStatement = (index: number) =>
+    setStatements((prev) => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +130,8 @@ const Apply = () => {
     const required: (keyof FormState)[] = [
       "legalBusinessName", "businessStartDate", "businessAddress", "entityType",
       "stateIncorporated", "ein", "industry", "ownerFirstName", "ownerLastName",
-      "dob", "ssn", "homeAddress", "ownership", "signature", "signatureDate",
+      "dob", "ssn", "homeAddress", "ownership", "bankStatementMonths",
+      "signature", "signatureDate",
     ];
     const missing = required.filter((k) => !form[k]);
     if (missing.length > 0) {
@@ -87,31 +143,58 @@ const Apply = () => {
       return;
     }
 
+    if (statements.some((file) => !file)) {
+      toast({
+        title: "Bank statements required",
+        description: `Please attach all ${STATEMENT_COUNT} of your most recent bank statements.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const rep = findRep(form.rep);
+    const body = JSON.stringify({
+      source: "full",
+      rep: rep?.name ?? "",
+      rep_email: rep?.email ?? "",
+      legal_business_name: form.legalBusinessName,
+      dba: form.dba,
+      business_start_date: form.businessStartDate,
+      business_address: form.businessAddress,
+      entity_type: form.entityType,
+      state_incorporated: form.stateIncorporated,
+      ein: form.ein,
+      industry: form.industry,
+      owner_name: `${form.ownerFirstName} ${form.ownerLastName}`.trim(),
+      email: "",
+      date_of_birth: form.dob,
+      ssn: form.ssn,
+      home_address: form.homeAddress,
+      ownership: form.ownership,
+      bank_statement_months: form.bankStatementMonths,
+      bank_statements: statements
+        .filter((file): file is EncodedFile => Boolean(file))
+        .map((file, i) => ({ ...file, label: `Bank Statement ${i + 1}` })),
+      owner_signature: form.signature,
+      signature_date: form.signatureDate,
+    });
+
+    if (body.length > MAX_PAYLOAD_BYTES) {
+      toast({
+        title: "Attachments too large",
+        description:
+          "Your bank statements are too large to submit together (over 4MB). Please upload smaller or compressed PDFs.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await fetch("/api/send-application-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: "full",
-          rep: form.rep,
-          legal_business_name: form.legalBusinessName,
-          dba: form.dba,
-          business_start_date: form.businessStartDate,
-          business_address: form.businessAddress,
-          entity_type: form.entityType,
-          state_incorporated: form.stateIncorporated,
-          ein: form.ein,
-          industry: form.industry,
-          owner_name: `${form.ownerFirstName} ${form.ownerLastName}`.trim(),
-          email: "",
-          date_of_birth: form.dob,
-          ssn: form.ssn,
-          home_address: form.homeAddress,
-          ownership: form.ownership,
-          owner_signature: form.signature,
-          signature_date: form.signatureDate,
-        }),
+        body,
       });
 
       if (!res.ok) {
@@ -171,9 +254,16 @@ const Apply = () => {
                         <SelectValue placeholder="Please Select" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">Not Assigned</SelectItem>
+                        {REPS.map((rep) => (
+                          <SelectItem key={rep.value} value={rep.value}>
+                            {rep.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Select your name so a copy of this application is sent to your inbox.
+                    </p>
                   </div>
 
                   <div className="space-y-6">
@@ -365,6 +455,73 @@ const Apply = () => {
                           </div>
                         </RadioGroup>
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <h3 className="text-center text-base font-semibold text-[#2c4a6e] border-b border-slate-200 pb-2">
+                      Bank Statements:
+                    </h3>
+
+                    <div>
+                      <Label htmlFor="bankStatementMonths">
+                        Months Covered (3 most recent) *
+                      </Label>
+                      <Input
+                        id="bankStatementMonths"
+                        placeholder="e.g. April, May, June 2026"
+                        value={form.bankStatementMonths}
+                        onChange={(e) => update("bankStatementMonths", e.target.value)}
+                      />
+                      <p className="text-xs text-slate-500 mt-1">
+                        List which three months the statements below cover.
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label>Upload Your 3 Most Recent Bank Statements (PDF) *</Label>
+                      <div className="grid gap-3 mt-2">
+                        {statements.map((file, index) => (
+                          <div key={index}>
+                            {file ? (
+                              <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <FileText className="h-4 w-4 text-[#2c4a6e] shrink-0" />
+                                  <span className="text-sm text-slate-700 truncate">
+                                    {file.name}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeStatement(index)}
+                                  className="text-slate-400 hover:text-slate-600"
+                                  aria-label={`Remove bank statement ${index + 1}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <label
+                                htmlFor={`statement-${index}`}
+                                className="flex items-center gap-2 cursor-pointer rounded-md border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500 hover:border-[#2c4a6e] hover:text-[#2c4a6e] transition-colors"
+                              >
+                                <Upload className="h-4 w-4 shrink-0" />
+                                <span>Bank Statement {index + 1} — choose PDF</span>
+                                <input
+                                  id={`statement-${index}`}
+                                  type="file"
+                                  accept="application/pdf,.pdf"
+                                  className="hidden"
+                                  onChange={(e) => setStatement(index, e.target.files?.[0])}
+                                />
+                              </label>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-2">
+                        PDF files only · up to 4MB each.
+                      </p>
                     </div>
                   </div>
 

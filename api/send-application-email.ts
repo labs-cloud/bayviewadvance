@@ -33,9 +33,22 @@ const FULL_LABELS: Record<string, string> = {
   date_of_birth: "Date of Birth",
   ssn: "SSN",
   home_address: "Home Address",
+  bank_statement_months: "Bank Statement Months",
   owner_signature: "Owner Signature",
   signature_date: "Signature Date",
 };
+
+type UploadedStatement = {
+  name?: string;
+  type?: string;
+  size?: number;
+  data?: string;
+  label?: string;
+};
+
+function base64FromDataUri(value = ""): string {
+  return value.includes(",") ? value.split(",")[1] : value;
+}
 
 const DISCLAIMER =
   'By signing below, each of the above-listed business and business owner(s) (individually and collectively, "you") authorize Bayview Advance ("B/A") and each of its representatives, successors, assigns and designees ("Recipients") that may be involved with or require commercial loans having daily repayment features or Merchant Cash Advance transactions, including without limitation the application(s) herein (collectively, "Transactions") to obtain consumer or personal, business and investigative reports and other information about you, including credit card processor statements and bank statements; bureau or non-consumer reporting agencies; and/or third parties. Equifax, Experian and/or from other credit bureaus, banks, creditors and other third parties. You also authorize B/A to transmit this application form, along with any of the foregoing information obtained in connection with this application, to any or all of the Recipients for the foregoing purposes. You also consent to the release, by any creditor or financial institution, of any information relating to any of you, to B/A and to each of the Recipients, on its own behalf.';
@@ -186,6 +199,7 @@ function pdfOwnerFields(payload: Record<string, unknown>): FieldPair[] {
     ["Date of Birth", String(payload.date_of_birth ?? "")],
     ["SSN", String(payload.ssn ?? "")],
     ["Home Address", String(payload.home_address ?? "")],
+    ["Bank Statement Months", String(payload.bank_statement_months ?? "")],
   ];
 }
 
@@ -358,27 +372,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const payload = (req.body ?? {}) as Record<string, unknown>;
     const { subject, html, replyTo, headline } = buildEmail(payload);
 
-    let attachment: { filename: string; content: string } | undefined;
+    const safeName =
+      headline.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "submission";
+
+    type EmailAttachment = { filename: string; content: string; contentType?: string };
+    const attachments: EmailAttachment[] = [];
+
+    // The application itself, rendered as a PDF (bank statements are NOT
+    // embedded here — they are attached separately below).
     try {
       const pdfBytes = await generatePdf(payload, headline);
-      const safeName =
-        headline.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "submission";
-      attachment = {
+      attachments.push({
         filename: `bayview-advance-application-${safeName}.pdf`,
         content: pdfBytes.toString("base64"),
-      };
+        contentType: "application/pdf",
+      });
     } catch (pdfErr) {
-      console.error("PDF generation failed; sending email without attachment:", pdfErr);
+      console.error("PDF generation failed; sending email without the application PDF:", pdfErr);
     }
+
+    // The applicant's three most recent bank statements, attached as-is.
+    const statements = Array.isArray(payload.bank_statements)
+      ? (payload.bank_statements as UploadedStatement[])
+      : [];
+    statements.forEach((file, i) => {
+      if (!file?.data) return;
+      const ext = file.name?.match(/\.[a-z0-9]+$/i)?.[0] || ".pdf";
+      const label = file.label || `Bank Statement ${i + 1}`;
+      attachments.push({
+        filename: `${label} - ${safeName}${ext}`.replace(/[^\w.\- ()]/g, ""),
+        content: base64FromDataUri(file.data),
+        contentType: file.type || "application/pdf",
+      });
+    });
+
+    // CC the submitting rep so a copy lands in their inbox; submissions inbox
+    // remains the primary recipient.
+    const repEmail =
+      typeof payload.rep_email === "string" &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.rep_email)
+        ? payload.rep_email
+        : undefined;
 
     const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: toEmail,
+      cc: repEmail,
       replyTo,
       subject,
       html,
-      attachments: attachment ? [attachment] : undefined,
+      attachments: attachments.length > 0 ? attachments : undefined,
     });
 
     if (error) {
@@ -389,7 +433,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       success: true,
       id: data?.id,
-      pdfAttached: Boolean(attachment),
+      attachments: attachments.length,
     });
   } catch (err) {
     console.error("send-application-email crash:", err);
