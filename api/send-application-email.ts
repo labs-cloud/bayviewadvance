@@ -44,10 +44,43 @@ type UploadedStatement = {
   size?: number;
   data?: string;
   label?: string;
+  // Set when the file was uploaded directly to Supabase Storage and only a
+  // reference (not the bytes) was sent in the request body.
+  bucket?: string;
+  path?: string;
 };
 
 function base64FromDataUri(value = ""): string {
   return value.includes(",") ? value.split(",")[1] : value;
+}
+
+// ----- Supabase Storage -----
+
+const SUPABASE_URL =
+  process.env.SUPABASE_URL || "https://hytbwhakvfbtczefakjs.supabase.co";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Download a private object from Supabase Storage using the service role key.
+// Bank statements live in a private bucket, so only the service role can read
+// them back to attach to the email.
+async function downloadFromStorage(bucket: string, path: string): Promise<Buffer> {
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
+  }
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  const url = `${SUPABASE_URL}/storage/v1/object/${encodeURIComponent(bucket)}/${encodedPath}`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+  });
+  if (!res.ok) {
+    throw new Error(
+      `Storage download failed: ${res.status} ${await res.text().catch(() => "")}`,
+    );
+  }
+  return Buffer.from(await res.arrayBuffer());
 }
 
 const DISCLAIMER =
@@ -391,20 +424,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error("PDF generation failed; sending email without the application PDF:", pdfErr);
     }
 
-    // The applicant's three most recent bank statements, attached as-is.
+    // The applicant's three most recent bank statements. These are normally
+    // uploaded directly to Supabase Storage (and downloaded here), but may also
+    // arrive inline as base64 when the direct upload fell back to the body.
     const statements = Array.isArray(payload.bank_statements)
       ? (payload.bank_statements as UploadedStatement[])
       : [];
-    statements.forEach((file, i) => {
-      if (!file?.data) return;
+    const missingStatements: string[] = [];
+    for (let i = 0; i < statements.length; i++) {
+      const file = statements[i];
+      if (!file) continue;
       const ext = file.name?.match(/\.[a-z0-9]+$/i)?.[0] || ".pdf";
       const label = file.label || `Bank Statement ${i + 1}`;
-      attachments.push({
-        filename: `${label} - ${safeName}${ext}`.replace(/[^\w.\- ()]/g, ""),
-        content: base64FromDataUri(file.data),
-        contentType: file.type || "application/pdf",
-      });
-    });
+      const filename = `${label} - ${safeName}${ext}`.replace(/[^\w.\- ()]/g, "");
+      const contentType = file.type || "application/pdf";
+
+      if (file.bucket && file.path) {
+        try {
+          const bytes = await downloadFromStorage(file.bucket, file.path);
+          attachments.push({
+            filename,
+            content: bytes.toString("base64"),
+            contentType,
+          });
+        } catch (storageErr) {
+          console.error(
+            `Failed to fetch bank statement from storage (${file.path}):`,
+            storageErr,
+          );
+          missingStatements.push(label);
+        }
+      } else if (file.data) {
+        attachments.push({
+          filename,
+          content: base64FromDataUri(file.data),
+          contentType,
+        });
+      }
+    }
+
+    // If any statement couldn't be retrieved from storage, flag it loudly in the
+    // email so the submissions team follows up rather than silently missing it.
+    let emailHtml = html;
+    let emailSubject = subject;
+    if (missingStatements.length > 0) {
+      emailSubject = `[STATEMENTS MISSING] ${subject}`;
+      const warning = ` <strong style="color:#b91c1c">Note: ${escapeHtml(
+        missingStatements.join(", "),
+      )} could not be retrieved and ${
+        missingStatements.length === 1 ? "is" : "are"
+      } not attached — please request ${
+        missingStatements.length === 1 ? "it" : "them"
+      } from the applicant.</strong>`;
+      emailHtml = html.replace(
+        "The full application is attached as a PDF.",
+        `The full application is attached as a PDF.${warning}`,
+      );
+    }
 
     // CC the submitting rep so a copy lands in their inbox; submissions inbox
     // remains the primary recipient.
@@ -420,8 +496,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       to: toEmail,
       cc: repEmail,
       replyTo,
-      subject,
-      html,
+      subject: emailSubject,
+      html: emailHtml,
       attachments: attachments.length > 0 ? attachments : undefined,
     });
 

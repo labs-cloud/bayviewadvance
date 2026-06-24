@@ -60,6 +60,29 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Funding application — bank statement uploads
+
+The funding application (`/apply`) lets applicants attach their three most recent
+bank statements. To keep large PDFs from hitting Vercel's ~4.5MB serverless
+request-body limit, statements are uploaded directly from the browser to a
+**private Supabase Storage bucket** (`bank-statements`); the
+`send-application-email` API then downloads them server-side and attaches them to
+the submission email.
+
+Required setup:
+
+1. **Run the storage migration** in `supabase/migrations/` (or apply it from the
+   Supabase dashboard). It provisions the private `bank-statements` bucket and an
+   anonymous upload policy.
+2. **Add the `SUPABASE_SERVICE_ROLE_KEY` environment variable** in Vercel
+   (Project → Settings → Environment Variables). The API uses it to read the
+   private statements back. Optionally set `SUPABASE_URL` if the project URL ever
+   changes (it defaults to the hosted project URL).
+
+If the direct upload fails, the form automatically falls back to sending the
+statements inline (subject to the 4.5MB limit), so submissions still work before
+the bucket/key are configured — they just can't carry large files yet.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/fdeab2f7-c1b8-43f6-9234-e6e1ee7b573c) and click on Share -> Publish.
