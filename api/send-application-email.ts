@@ -57,7 +57,7 @@ function base64FromDataUri(value = ""): string {
 // ----- Supabase Storage -----
 
 const SUPABASE_URL =
-  process.env.SUPABASE_URL || "https://hytbwhakvfbtczefakjs.supabase.co";
+  process.env.SUPABASE_URL || "https://xkbesoyvknktqjnxprbk.supabase.co";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Download a private object from Supabase Storage using the service role key.
