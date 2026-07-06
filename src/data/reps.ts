@@ -11,11 +11,11 @@ export type Rep = {
 // submission is CC'd to this email — the main submissions inbox always stays the
 // primary recipient. Add new reps here as "value / name / email" entries.
 export const REPS: Rep[] = [
-  { value: "ryan-ariza", name: "Ryan Ariza", email: "ryan@bayviewadvance.com" },
   { value: "david-miller", name: "David Miller", email: "davidm@bayviewadvance.com" },
   { value: "asdrubal-acosta", name: "Asdrubal Acosta", email: "asdrubal@bayviewadvance.com" },
   { value: "hershey-klein", name: "Hershey Klein", email: "labs@optentia.com" },
   { value: "md-safir", name: "MD Safir", email: "MD@bayviewadvance.com" },
+  { value: "joseph-katan", name: "Joseph Katan", email: "joseph@bayviewadvance.com" },
 ];
 
 export const findRep = (value: string): Rep | undefined =>
