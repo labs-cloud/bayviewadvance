@@ -39,7 +39,7 @@ const QuickApply = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const requiredFields = ['fullName', 'businessName', 'email', 'phone', 'monthlyRevenue', 'fundingNeeded', 'purpose'];
+    const requiredFields = ['fullName', 'businessName', 'email', 'monthlyRevenue', 'fundingNeeded', 'purpose'];
     const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
 
     if (missingFields.length > 0) {
@@ -189,7 +189,7 @@ const QuickApply = () => {
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="phone">Phone Number (Mobile) *</Label>
+                      <Label htmlFor="phone">Phone Number (Mobile)</Label>
                       <div className="relative">
                         <Phone className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
                         <Input
@@ -199,7 +199,6 @@ const QuickApply = () => {
                           placeholder="(555) 123-4567"
                           value={formData.phone}
                           onChange={(e) => handleInputChange('phone', e.target.value)}
-                          required
                         />
                       </div>
                     </div>
