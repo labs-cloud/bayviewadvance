@@ -390,6 +390,18 @@
   accent-color: #286aa6;
 }
 
+.broker-checkbox.broker-field-wide span {
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4b5a68;
+}
+
+.broker-checkbox a {
+  color: #286aa6;
+  text-decoration: underline;
+}
+
 .broker-error-banner {
   display: flex;
   align-items: center;

@@ -48,6 +48,7 @@ type FormState = {
   signatureName: string;
   signature: string;
   agreed: boolean;
+  smsConsent: boolean;
 };
 
 const initialForm: FormState = {
@@ -73,6 +74,7 @@ const initialForm: FormState = {
   signatureName: "",
   signature: "",
   agreed: false,
+  smsConsent: false,
 };
 
 const uploadLabels: Record<UploadKey, string> = {
@@ -446,6 +448,20 @@ export default function BrokerOnboarding() {
             <Field label="City" value={form.city} onChange={(value) => setField("city", value)} />
             <Field label="State" value={form.state} onChange={(value) => setField("state", value)} />
             <Field label="ZIP" value={form.zip} onChange={(value) => setField("zip", value)} />
+            <label className="broker-checkbox broker-field-wide">
+              <input
+                type="checkbox"
+                checked={form.smsConsent}
+                onChange={(event) => setField("smsConsent", event.target.checked)}
+              />
+              <span>
+                I agree to receive recurring automated text messages at the phone number provided.
+                Msg &amp; data rates may apply. Msg frequency varies. Reply HELP for help and STOP to
+                cancel. View our{" "}
+                <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and{" "}
+                <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.
+              </span>
+            </label>
           </div>
         )}
 

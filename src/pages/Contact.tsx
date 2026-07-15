@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Phone, Mail, MapPin, Clock, MessageSquare } from "lucide-react";
 
 const Contact = () => {
@@ -146,6 +147,16 @@ const Contact = () => {
                       rows={4}
                       required
                     />
+                  </div>
+
+                  <div className="flex items-start space-x-3">
+                    <Checkbox id="sms-consent" className="mt-1" />
+                    <Label htmlFor="sms-consent" className="text-sm leading-relaxed text-slate-600 font-normal">
+                      I agree to receive recurring automated text messages at the phone number provided. Msg &amp; data rates may apply. Msg frequency varies. Reply HELP for help and STOP to cancel. View our{" "}
+                      <a href="/terms" className="text-[#2c4a6e] hover:underline">Terms of Service</a>
+                      {" "}and{" "}
+                      <a href="/privacy" className="text-[#2c4a6e] hover:underline">Privacy Policy</a>.
+                    </Label>
                   </div>
 
                   <Button

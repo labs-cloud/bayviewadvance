@@ -268,10 +268,10 @@ const QuickApply = () => {
                         onCheckedChange={(checked) => handleInputChange('contactConsent', checked === true)}
                       />
                       <Label htmlFor="contact-consent" className="text-sm leading-relaxed text-slate-600">
-                        (Optional) I agree to receive automated transactional text messages from Bayview Advance about my application, status, and appointments. Message frequency varies. Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help. See our{" "}
-                        <Link to="/terms" className="text-[#2c4a6e] hover:underline">Terms</Link>
+                        I agree to receive recurring automated text messages at the phone number provided. Msg &amp; data rates may apply. Msg frequency varies. Reply HELP for help and STOP to cancel. View our{" "}
+                        <Link to="/terms" className="text-[#2c4a6e] hover:underline">Terms of Service</Link>
                         {" "}and{" "}
-                        <Link to="/privacy" className="text-[#2c4a6e] hover:underline">Privacy Policy</Link>. This consent is not required to submit your application.
+                        <Link to="/privacy" className="text-[#2c4a6e] hover:underline">Privacy Policy</Link>.
                       </Label>
                     </div>
                     <div className="flex items-start space-x-3">

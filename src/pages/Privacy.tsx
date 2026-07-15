@@ -70,6 +70,10 @@ const Privacy = () => {
               providers used only to deliver the messages you have requested.
             </li>
           </ul>
+          <p>
+            Text messaging originator opt-in data and consent will not be shared with any third parties,
+            excluding aggregators and providers of the Text Message services.
+          </p>
         </section>
         <div className="h-px bg-border my-8" aria-hidden="true" />
 

@@ -4,7 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowRight, DollarSign, Building, Calendar } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const ApplicationForm = () => {
   return (
@@ -164,6 +166,16 @@ const ApplicationForm = () => {
                     placeholder="Describe how you plan to use the funding (inventory, equipment, expansion, etc.)"
                     className="h-20"
                   />
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <Checkbox id="sms-consent" className="mt-1" />
+                  <Label htmlFor="sms-consent" className="text-sm leading-relaxed text-slate-600 font-normal">
+                    I agree to receive recurring automated text messages at the phone number provided. Msg &amp; data rates may apply. Msg frequency varies. Reply HELP for help and STOP to cancel. View our{" "}
+                    <Link to="/terms" className="text-[#2c4a6e] hover:underline">Terms of Service</Link>
+                    {" "}and{" "}
+                    <Link to="/privacy" className="text-[#2c4a6e] hover:underline">Privacy Policy</Link>.
+                  </Label>
                 </div>
 
                 <div className="text-center pt-4">
