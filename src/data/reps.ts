@@ -18,7 +18,7 @@ export const REPS: Rep[] = [
   { value: "joseph-katan", name: "Joseph Katan", email: "joseph@bayviewadvance.com" },
   { value: "alex", name: "Alex", email: "alex@bayviewadvance.com" },
   { value: "daevon", name: "Daevon", email: "daevon@bayviewadvance.com" },
-  { value: "ahmir", name: "Ahmir", email: "ahmir@bayviewadvance.com" },
+  { value: "ahmir", name: "Ahmir", email: "amccree@bayviewadvance.com" },
 ];
 
 export const findRep = (value: string): Rep | undefined =>
