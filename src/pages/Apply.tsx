@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { REPS, findRep } from "@/data/reps";
+import { supabase } from "@/integrations/supabase/client";
 import { Upload, FileText, X } from "lucide-react";
 
 const US_STATES = [
@@ -46,11 +47,33 @@ type FormState = {
 
 type EncodedFile = { name: string; type: string; size: number; data: string };
 
+// A reference to a statement uploaded straight to Supabase Storage. Only this
+// small descriptor travels in the JSON body; the bytes never touch the
+// serverless request, so the 4.5MB body limit no longer applies.
+type StatementRef = {
+  bucket: string;
+  path: string;
+  name: string;
+  type: string;
+  size: number;
+  label: string;
+};
+
 const STATEMENT_COUNT = 3;
 
-// Vercel caps a serverless request body at ~4.5MB. The three statements are
-// sent base64 (~33% larger) inside one JSON body, so keep the combined payload
-// comfortably under that ceiling.
+// Bank statements are uploaded directly to Supabase Storage, so each file can be
+// comfortably large. Resend caps a single email at 40MB total, so keep each
+// statement well under that once all three plus the application PDF are summed.
+const MAX_FILE_BYTES = 15 * 1024 * 1024;
+
+// Storage bucket that holds applicant bank statements. Must exist in Supabase
+// (see api/send-application-email.ts for the server-side download + the SQL to
+// provision it). Private bucket — only the service role can read it back.
+const STATEMENTS_BUCKET = "bank-statements";
+
+// Fallback only: when the direct upload to Supabase Storage fails, the
+// statements are sent base64 (~33% larger) inside the JSON body instead. Vercel
+// caps that body at ~4.5MB, so keep the combined fallback payload under this.
 const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
 
 const readFile = (file: File): Promise<EncodedFile> =>
@@ -66,6 +89,44 @@ const readFile = (file: File): Promise<EncodedFile> =>
     reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
     reader.readAsDataURL(file);
   });
+
+const sanitizeFilename = (name: string) =>
+  name.replace(/[^\w.-]+/g, "_").slice(-80) || "statement.pdf";
+
+// Upload the selected statements straight to Supabase Storage and return small
+// references to each. Returns null if any upload fails so the caller can fall
+// back to inlining the files in the request body.
+const uploadStatementsToStorage = async (
+  files: File[],
+): Promise<StatementRef[] | null> => {
+  try {
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const refs: StatementRef[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const path = `${stamp}/statement-${i + 1}-${sanitizeFilename(file.name)}`;
+      const { error } = await supabase.storage
+        .from(STATEMENTS_BUCKET)
+        .upload(path, file, {
+          contentType: file.type || "application/pdf",
+          upsert: false,
+        });
+      if (error) throw error;
+      refs.push({
+        bucket: STATEMENTS_BUCKET,
+        path,
+        name: file.name,
+        type: file.type || "application/pdf",
+        size: file.size,
+        label: `Bank Statement ${i + 1}`,
+      });
+    }
+    return refs;
+  } catch (err) {
+    console.error("Bank statement storage upload failed; falling back to inline:", err);
+    return null;
+  }
+};
 
 const Apply = () => {
   const today = new Date().toISOString().slice(0, 10);
@@ -92,27 +153,26 @@ const Apply = () => {
     signature: "",
     signatureDate: today,
   });
-  const [statements, setStatements] = useState<(EncodedFile | null)[]>(
+  const [statements, setStatements] = useState<(File | null)[]>(
     Array(STATEMENT_COUNT).fill(null),
   );
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const setStatement = async (index: number, file?: File) => {
+  const setStatement = (index: number, file?: File) => {
     if (!file) return;
-    if (file.size > MAX_PAYLOAD_BYTES) {
+    if (file.size > MAX_FILE_BYTES) {
       toast({
         title: "File too large",
-        description: `${file.name} is over 4MB. Please upload a smaller or compressed PDF.`,
+        description: `${file.name} is over 15MB. Please upload a smaller or compressed PDF.`,
         variant: "destructive",
       });
       return;
     }
-    const encoded = await readFile(file);
     setStatements((prev) => {
       const next = [...prev];
-      next[index] = encoded;
+      next[index] = file;
       return next;
     });
   };
@@ -143,7 +203,8 @@ const Apply = () => {
       return;
     }
 
-    if (statements.some((file) => !file)) {
+    const selected = statements.filter((file): file is File => Boolean(file));
+    if (selected.length < STATEMENT_COUNT) {
       toast({
         title: "Bank statements required",
         description: `Please attach all ${STATEMENT_COUNT} of your most recent bank statements.`,
@@ -153,7 +214,7 @@ const Apply = () => {
     }
 
     const rep = findRep(form.rep);
-    const body = JSON.stringify({
+    const basePayload = {
       source: "full",
       rep: rep?.name ?? "",
       rep_email: rep?.email ?? "",
@@ -172,25 +233,42 @@ const Apply = () => {
       home_address: form.homeAddress,
       ownership: form.ownership,
       bank_statement_months: form.bankStatementMonths,
-      bank_statements: statements
-        .filter((file): file is EncodedFile => Boolean(file))
-        .map((file, i) => ({ ...file, label: `Bank Statement ${i + 1}` })),
       owner_signature: form.signature,
       signature_date: form.signatureDate,
-    });
-
-    if (body.length > MAX_PAYLOAD_BYTES) {
-      toast({
-        title: "Attachments too large",
-        description:
-          "Your bank statements are too large to submit together (over 4MB). Please upload smaller or compressed PDFs.",
-        variant: "destructive",
-      });
-      return;
-    }
+    };
 
     setIsSubmitting(true);
     try {
+      // Preferred path: upload the statements straight to Supabase Storage and
+      // send only lightweight references, so the request body stays tiny.
+      const refs = await uploadStatementsToStorage(selected);
+
+      let body: string;
+      if (refs) {
+        body = JSON.stringify({ ...basePayload, bank_statements: refs });
+      } else {
+        // Fallback: inline the files as base64 in the body. Bounded by Vercel's
+        // ~4.5MB request limit, so guard the size before sending.
+        const encoded = await Promise.all(selected.map(readFile));
+        body = JSON.stringify({
+          ...basePayload,
+          bank_statements: encoded.map((file, i) => ({
+            ...file,
+            label: `Bank Statement ${i + 1}`,
+          })),
+        });
+        if (body.length > MAX_PAYLOAD_BYTES) {
+          toast({
+            title: "Attachments too large",
+            description:
+              "We couldn't upload your statements and they're too large to send directly (over 4MB). Please try again, or upload smaller or compressed PDFs.",
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const res = await fetch("/api/send-application-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -200,11 +278,16 @@ const Apply = () => {
       if (!res.ok) {
         const text = await res.text();
         console.error("send-application-email response:", res.status, text);
+        if (res.status === 413) {
+          throw new Error(
+            "Your bank statements are too large to submit. Please upload smaller or compressed PDFs and try again.",
+          );
+        }
         let detailError: string | undefined;
         try {
           detailError = JSON.parse(text)?.error;
         } catch {
-          // non-JSON response
+          // non-JSON response (e.g. a platform error page)
         }
         throw new Error(detailError ?? `HTTP ${res.status}: ${text.slice(0, 200)}`);
       }
@@ -214,7 +297,10 @@ const Apply = () => {
       console.error("Error submitting application:", error);
       toast({
         title: "Submission failed",
-        description: "There was an error submitting your application. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "There was an error submitting your application. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -520,7 +606,7 @@ const Apply = () => {
                         ))}
                       </div>
                       <p className="text-xs text-slate-500 mt-2">
-                        PDF files only · up to 4MB each.
+                        PDF files only · up to 15MB each.
                       </p>
                     </div>
                   </div>
